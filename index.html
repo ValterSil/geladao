@@ -1,0 +1,2970 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Gestão de Geladões</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon-192x192.png" type="image/png">
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com "></script>
+  <!-- Font Awesome -->
+  <script src="https://kit.fontawesome.com/a2e7fbd66c.js " crossorigin="anonymous"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js "></script>
+    <style>
+        /* Estilos personalizados para o SaaS de Geladão Gourmet */
+
+        /* Esconder a barra de rolagem mantendo a funcionalidade */
+        .hide-scrollbar {
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE and Edge */
+        }
+
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none; /* Chrome, Safari, Opera */
+        }
+
+        /* Animações */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        /* Estilo do cartão de receita */
+        .recipe-card {
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+
+        .recipe-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Estilos para notificações */
+        .notification {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            padding: 0.75rem 1.25rem;
+            border-radius: 0.375rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            z-index: 100;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        .notification-success {
+            background-color: #DEF7EC;
+            color: #057A55;
+            border-left: 4px solid #057A55;
+        }
+
+        .notification-error {
+            background-color: #FDE8E8;
+            color: #E02424;
+            border-left: 4px solid #E02424;
+        }
+
+        .notification-info {
+            background-color: #E1EFFE;
+            color: #1E429F;
+            border-left: 4px solid #1E429F;
+        }
+
+        /* Dark mode para notificações */
+        .dark .notification-success {
+            background-color: #0D543D;
+            color: #DEF7EC;
+        }
+
+        .dark .notification-error {
+            background-color: #771D1D;
+            color: #FDE8E8;
+        }
+
+        .dark .notification-info {
+            background-color: #1A365D;
+            color: #E1EFFE;
+        }
+
+        /* Animação para inputs inválidos */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        input:invalid:focus, 
+        select:invalid:focus {
+            animation: shake 0.3s;
+            border-color: #E02424;
+        }
+
+        /* Contador de moedas animado para o dashboard */
+        @keyframes countUp {
+            from { opacity: 0.3; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .count-animation {
+            animation: countUp 0.5s ease-out;
+        }
+    </style>
+	 <script>
+        // Configuração do tema Tailwind
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE',
+                        'primary-dark': '#4948B3',
+                        'primary-light': '#7978E9',
+                        'ice-blue': '#E0F7FF',
+                        'ice-pink': '#FFE6F2',
+                        'ice-green': '#E3FCE9',
+                    }
+                }
+            }
+        }
+        
+        // Detectar preferência de modo escuro
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+    </script>
+</head>
+<body class="bg-white dark:bg-gray-900 min-h-screen">
+    <!-- Cabeçalho -->
+    <header class="bg-primary text-white shadow-md dark:shadow-gray-700">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center">
+                <i class="fas fa-ice-cream text-2xl mr-2"></i>
+                <h1 class="text-xl font-bold">Geladão Sol de Verão</h1>
+            </div>
+            <div class="flex items-center space-x-2">
+                <!-- Botão de tema claro/escuro -->
+                <button id="themeToggle" class="p-2 rounded-full hover:bg-primary-dark">
+                    <i id="themeIcon" class="fas fa-moon"></i>
+                </button>
+                <!-- Botão para limpar os dados do localStorage -->
+                <button id="clearStorage" class="p-2 rounded-full hover:bg-primary-dark" title="Limpar dados">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Menu de navegação -->
+    <nav class="bg-gray-100 dark:bg-gray-800 shadow-sm">
+        <div class="container mx-auto">
+            <div class="flex overflow-x-auto hide-scrollbar">
+                <button data-tab="dashboard" class="tab-button active whitespace-nowrap px-4 py-3 font-medium text-gray-700 dark:text-gray-200 border-b-2 border-primary">
+                    <i class="fas fa-chart-line mr-1"></i> Dashboard
+                </button>
+                <button data-tab="ingredients" class="tab-button whitespace-nowrap px-4 py-3 font-medium text-gray-700 dark:text-gray-200 border-b-2 border-transparent">
+                    <i class="fas fa-carrot mr-1"></i> Ingredientes
+                </button>
+                <button data-tab="recipes" class="tab-button whitespace-nowrap px-4 py-3 font-medium text-gray-700 dark:text-gray-200 border-b-2 border-transparent">
+                    <i class="fas fa-book mr-1"></i> Receitas
+                </button>
+                <button data-tab="pricing" class="tab-button whitespace-nowrap px-4 py-3 font-medium text-gray-700 dark:text-gray-200 border-b-2 border-transparent">
+                    <i class="fas fa-tags mr-1"></i> Preços
+                </button>
+                <button data-tab="costs" class="tab-button whitespace-nowrap px-4 py-3 font-medium text-gray-700 dark:text-gray-200 border-b-2 border-transparent">
+                    <i class="fas fa-file-invoice-dollar mr-1"></i> Custos Fixos
+                </button>
+                <button data-tab="labor" class="tab-button whitespace-nowrap px-4 py-3 font-medium text-gray-700 dark:text-gray-200 border-b-2 border-transparent">
+                    <i class="fas fa-user-clock mr-1"></i> Mão de Obra
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Conteúdo principal -->
+    <main class="container mx-auto p-4">
+        <!-- Dashboard (Padrão) -->
+        <section id="dashboard" class="tab-content">
+            <h2 class="text-xl font-bold mb-4 text-gray-800 dark:text-white">Visão Geral do Negócio</h2>
+            
+            <!-- Cartões de resumo -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-ice-blue dark:bg-blue-900 p-4 rounded-lg shadow">
+                    <h3 class="font-bold text-blue-800 dark:text-blue-200">Receitas (Mês)</h3>
+                    <p class="text-2xl font-bold text-blue-600 dark:text-blue-300">R$ <span id="totalRevenue">0,00</span></p>
+                </div>
+                <div class="bg-ice-pink dark:bg-red-900 p-4 rounded-lg shadow">
+                    <h3 class="font-bold text-red-800 dark:text-red-200">Despesas (Mês)</h3>
+                    <p class="text-2xl font-bold text-red-600 dark:text-red-300">R$ <span id="totalExpenses">0,00</span></p>
+                </div>
+                <div class="bg-ice-green dark:bg-green-900 p-4 rounded-lg shadow">
+                    <h3 class="font-bold text-green-800 dark:text-green-200">Lucro (Mês)</h3>
+                    <p class="text-2xl font-bold text-green-600 dark:text-green-300">R$ <span id="totalProfit">0,00</span></p>
+                </div>
+            </div>
+            
+            <!-- Gráficos -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+                    <h3 class="font-bold mb-3 text-gray-800 dark:text-white">Vendas por Produto</h3>
+                    <div class="h-64">
+                        <canvas id="productSalesChart"></canvas>
+                    </div>
+                </div>
+                <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+                    <h3 class="font-bold mb-3 text-gray-800 dark:text-white">Receitas vs Despesas</h3>
+                    <div class="h-64">
+                        <canvas id="revenueExpenseChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Transações Recentes -->
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-bold text-gray-800 dark:text-white">Transações Recentes</h3>
+                    <button id="addTransactionBtn" class="bg-primary hover:bg-primary-dark text-white px-3 py-1 rounded">
+                        <i class="fas fa-plus mr-1"></i> Nova Transação
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="bg-gray-100 dark:bg-gray-700">
+                                <th class="py-2 px-3 text-left text-gray-800 dark:text-gray-200">Data</th>
+                                <th class="py-2 px-3 text-left text-gray-800 dark:text-gray-200">Descrição</th>
+                                <th class="py-2 px-3 text-left text-gray-800 dark:text-gray-200">Tipo</th>
+                                <th class="py-2 px-3 text-right text-gray-800 dark:text-gray-200">Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactionsTable">
+                            <!-- Conteúdo será inserido via JavaScript -->
+                            <tr>
+                                <td colspan="4" class="text-center py-4 text-gray-500 dark:text-gray-400">
+                                    Nenhuma transação registrada
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Seção de Ingredientes -->
+        <section id="ingredients" class="tab-content hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-800 dark:text-white">Gerenciamento de Ingredientes</h2>
+                <button id="addIngredientBtn" class="bg-primary hover:bg-primary-dark text-white px-3 py-2 rounded">
+                    <i class="fas fa-plus mr-1"></i> Novo Ingrediente
+                </button>
+            </div>
+            
+            <!-- Filtro e Busca -->
+            <div class="flex flex-col md:flex-row gap-3 mb-4">
+                <div class="flex-grow">
+                    <input type="text" id="ingredientSearch" placeholder="Buscar ingrediente..." 
+                        class="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-base">
+                </div>
+                <div>
+                    <select id="ingredientCategory" class="px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-base">
+                        <option value="">Todas Categorias</option>
+                        <option value="frutas">Frutas</option>
+                        <option value="bases">Bases</option>
+                        <option value="embalagens">Embalagens</option>
+                        <option value="outros">Outros</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- Tabela de Ingredientes -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead>
+                            <tr class="bg-gray-50 dark:bg-gray-700">
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Ingrediente
+                                </th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Categoria
+                                </th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Unidade
+                                </th>
+                                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Conteúdo
+                                </th>
+                                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Preço Unit.
+                                </th>
+                                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Ações
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="ingredientsTable" class="divide-y divide-gray-200 dark:divide-gray-700">
+                            <!-- Conteúdo será inserido via JavaScript -->
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-gray-500 dark:text-gray-400">
+                                    Nenhum ingrediente registrado
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Seção de Receitas -->
+        <section id="recipes" class="tab-content hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-800 dark:text-white">Gerenciamento de Receitas</h2>
+                <button id="addRecipeBtn" class="bg-primary hover:bg-primary-dark text-white px-3 py-2 rounded">
+                    <i class="fas fa-plus mr-1"></i> Nova Receita
+                </button>
+            </div>
+            
+            <!-- Filtro e Busca -->
+            <div class="mb-4">
+                <input type="text" id="recipeSearch" placeholder="Buscar receita..." 
+                    class="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-base">
+            </div>
+            
+            <!-- Lista de Receitas -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="recipesList">
+                <!-- Conteúdo será inserido via JavaScript -->
+                <div class="text-center py-8 text-gray-500 dark:text-gray-400 col-span-full">
+                    Nenhuma receita registrada
+                </div>
+            </div>
+        </section>
+
+        <!-- Seção de Preços -->
+        <section id="pricing" class="tab-content hidden">
+            <h2 class="text-xl font-bold mb-4 text-gray-800 dark:text-white">Cálculo de Preços</h2>
+            
+           
+            <!-- Tabela de Preços -->
+			<div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
+				<div class="overflow-x-auto">
+					<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+						<thead>
+							<tr class="bg-gray-50 dark:bg-gray-700">
+								<th class="px-2 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Receita</th>
+								<th class="px-2 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Custo Material</th>
+								<th class="px-2 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Custo M. Obra</th>
+								<th class="px-2 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Custos Fixos</th>
+								<th class="px-2 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Custo Produção</th>
+								<th class="px-2 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">% Lucro</th>
+								<th class="px-2 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">% Máquina</th>
+								<th class="px-2 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">% APP</th>
+								<th class="px-2 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Lucro Total</th>
+								<th class="px-2 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Preço Unidade</th>
+								<th class="px-2 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Preço Final</th>
+							</tr>
+						</thead>
+						<tbody id="pricingTable" class="divide-y divide-gray-200 dark:divide-gray-700">
+							<!-- Conteúdo será inserido via JavaScript -->
+							<tr>
+								<td colspan="11" class="text-center py-4 text-gray-500 dark:text-gray-400">
+									Nenhuma receita cadastrada para cálculo de preço
+								</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+            
+            <!-- Simulador de Preços -->
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+                <h3 class="font-bold mb-3 text-gray-800 dark:text-white">Simulador de Preços</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Selecione a Receita
+                        </label>
+                        <select id="simulatorRecipe" class="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-base">
+                            <option value="">Selecione uma receita</option>
+                            <!-- Opções inseridas via JavaScript -->
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Margem de Lucro (%)
+                        </label>
+                        <input type="number" id="simulatorMargin" value="50" min="0" max="1000" 
+                            class="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-base">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Taxa de Cartão/Máquina (%)
+                        </label>
+                        <input type="number" id="simulatorCardFee" value="3.5" min="0" max="100" step="0.01" 
+                            class="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-base">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Taxa de APP (%)
+                        </label>
+                        <input type="number" id="simulatorAppFee" value="0" min="0" max="100" step="0.01" 
+                            class="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-base">
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <button id="simulateBtn" class="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded">
+                        Atualizar Preço
+                    </button>
+                </div>
+                
+                <div id="simulationResult" class="mt-4 p-4 bg-gray-100 dark:bg-gray-700 rounded hidden">
+                    <h4 class="font-bold mb-2 text-gray-800 dark:text-white">Resultado da Simulação</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Custo de Produção:</p>
+                            <p class="text-lg font-bold text-gray-800 dark:text-white">R$ <span id="simCostResult">0,00</span></p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Preço Sugerido:</p>
+                            <p class="text-lg font-bold text-green-600 dark:text-green-400">R$ <span id="simPriceResult">0,00</span></p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Preço por Unidade:</p>
+                            <p class="text-lg font-bold text-gray-800 dark:text-white">R$ <span id="simUnitPriceResult">0,00</span></p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Lucro Total:</p>
+                            <p class="text-lg font-bold text-blue-600 dark:text-blue-400">R$ <span id="simProfitResult">0,00</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Seção de Custos Fixos -->
+        <section id="costs" class="tab-content hidden">
+            <h2 class="text-xl font-bold mb-4 text-gray-800 dark:text-white">Gerenciamento de Custos Fixos</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow col-span-full md:col-span-1">
+                    <h3 class="font-bold mb-3 text-gray-800 dark:text-white">Adicionar/Editar Custo Fixo</h3>
+                    
+                    <form id="costForm">
+                        <input type="hidden" id="costId" value="">
+                        
+                        <div class="mb-3">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" for="costName">
+                                Descrição
+                            </label>
+                            <input type="text" id="costName" class="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-base" 
+                                placeholder="Ex: Água, Luz, Internet" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" for="costValue">
+                                Valor Mensal (R$)
+                            </label>
+                            <input type="number" id="costValue" class="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-base" 
+                                step="0.01" min="0" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="flex items-center">
+                                <input type="checkbox" id="divideWithHome" class="mr-2">
+                                <span class="text-sm text-gray-700 dark:text-gray-300">Dividir com residência</span>
+                            </label>
+                        </div>
+                        
+                        <div class="flex justify-between">
+                            <button type="submit" class="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded">
+                                Salvar Custo
+                            </button>
+                            <button type="button" id="cancelCostBtn" class="bg-gray-300 hover:bg-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-white px-4 py-2 rounded">
+                                Cancelar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                
+                <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow col-span-full md:col-span-2">
+                    <h3 class="font-bold mb-3 text-gray-800 dark:text-white">Custos Fixos Cadastrados</h3>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <thead>
+                                <tr class="bg-gray-50 dark:bg-gray-700">
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        Descrição
+                                    </th>
+                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        Valor Mensal
+                                    </th>
+                                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        Divide c/ Casa
+                                    </th>
+                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        Custo Produção
+                                    </th>
+                                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        Ações
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody id="costsTable" class="divide-y divide-gray-200 dark:divide-gray-700">
+                                <!-- Conteúdo será inserido via JavaScript -->
+                                <tr>
+                                    <td colspan="5" class="text-center py-4 text-gray-500 dark:text-gray-400">
+                                        Nenhum custo fixo registrado
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Resumo dos Custos Fixos -->
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+                <h3 class="font-bold mb-3 text-gray-800 dark:text-white">Resumo dos Custos Fixos</h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="bg-gray-100 dark:bg-gray-700 p-3 rounded">
+                        <p class="text-sm text-gray-600 dark:text-gray-400">Total Mensal</p>
+                        <p class="text-lg font-bold text-gray-800 dark:text-white">R$ <span id="totalMonthlyCost">0,00</span></p>
+                    </div>
+                    <div class="bg-gray-100 dark:bg-gray-700 p-3 rounded">
+                        <p class="text-sm text-gray-600 dark:text-gray-400">Custo por Dia</p>
+                        <p class="text-lg font-bold text-gray-800 dark:text-white">R$ <span id="costPerDay">0,00</span></p>
+                    </div>
+                    <div class="bg-gray-100 dark:bg-gray-700 p-3 rounded">
+                        <p class="text-sm text-gray-600 dark:text-gray-400">Custo por Hora</p>
+                        <p class="text-lg font-bold text-gray-800 dark:text-white">R$ <span id="costPerHour">0,00</span></p>
+                    </div>
+                    <div class="bg-gray-100 dark:bg-gray-700 p-3 rounded">
+                        <p class="text-sm text-gray-600 dark:text-gray-400">Custo por Minuto</p>
+                        <p class="text-lg font-bold text-gray-800 dark:text-white">R$ <span id="costPerMinute">0,00</span></p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Seção de Mão de Obra -->
+        <section id="labor" class="tab-content hidden">
+            <h2 class="text-xl font-bold mb-4 text-gray-800 dark:text-white">Configuração de Mão de Obra</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+                    <h3 class="font-bold mb-3 text-gray-800 dark:text-white">Dados de Mão de Obra</h3>
+                    
+                    <form id="laborForm">
+                        <div class="mb-3">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" for="monthlySalary">
+                                Salário Mensal Desejado (R$)
+                            </label>
+                            <input type="number" id="monthlySalary" class="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-base" 
+                                step="0.01" min="0" value="2500.00" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" for="workDaysPerMonth">
+                                Dias de Trabalho por Mês
+                            </label>
+                            <input type="number" id="workDaysPerMonth" class="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-base" 
+                                min="1" max="31" value="30" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" for="workHoursPerDay">
+                                Horas de Trabalho por Dia
+                            </label>
+                            <input type="number" id="workHoursPerDay" class="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-base" 
+                                min="1" max="24" value="12" required>
+                        </div>
+                        
+                        <button type="submit" class="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded">
+                            Salvar Configurações
+                        </button>
+                    </form>
+                </div>
+                
+                <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+                    <h3 class="font-bold mb-3 text-gray-800 dark:text-white">Valores Calculados</h3>
+                    
+                    <div class="grid grid-cols-1 gap-4">
+                        <div class="bg-gray-100 dark:bg-gray-700 p-3 rounded">
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Total de Horas por Mês</p>
+                            <p class="text-lg font-bold text-gray-800 dark:text-white"><span id="totalHoursPerMonth">360</span> horas</p>
+                        </div>
+                        <div class="bg-gray-100 dark:bg-gray-700 p-3 rounded">
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Valor do Salário-Dia</p>
+                            <p class="text-lg font-bold text-gray-800 dark:text-white">R$ <span id="salaryPerDay">83,33</span></p>
+                        </div>
+                        <div class="bg-gray-100 dark:bg-gray-700 p-3 rounded">
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Valor do Prolabore-Hora</p>
+                            <p class="text-lg font-bold text-gray-800 dark:text-white">R$ <span id="salaryPerHour">6,94</span></p>
+                        </div>
+                        <div class="bg-gray-100 dark:bg-gray-700 p-3 rounded">
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Valor do Prolabore-Minuto</p>
+                            <p class="text-lg font-bold text-gray-800 dark:text-white">R$ <span id="salaryPerMinute">0,12</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal de Ingrediente -->
+    <div id="ingredientModal" class="hidden fixed inset-0 z-50 overflow-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg max-w-md w-full">
+            <div class="flex justify-between items-center p-4 border-b dark:border-gray-700">
+                <h3 class="text-lg font-bold text-gray-800 dark:text-white" id="ingredientModalTitle">Adicionar Ingrediente</h3>
+                <button class="text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-gray-100" id="closeIngredientModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="ingredientForm" class="p-4">
+                <input type="hidden" id="ingredientId">
+                
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" for="ingredientName">
+                        Nome do Ingrediente
+                    </label>
+                    <input type="text" id="ingredientName" class="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-base" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" for="ingredientCategory">
+                        Categoria
+                    </label>
+                    <select id="ingredientCategoryInput" class="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-base" required>
+                        <option value="frutas">Frutas</option>
+                        <option value="bases">Bases</option>
+                        <option value="embalagens">Embalagens</option>
+                        <option value="outros">Outros</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" for="ingredientUnit">
+                        Unidade de Medida
+                    </label>
+                    <select id="ingredientUnit" class="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-base" required>
+                        <option value="g">Gramas (g)</option>
+                        <option value="ml">Mililitros (ml)</option>
+                        <option value="und">Unidade (und)</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" for="ingredientContent">
+                        Conteúdo da Embalagem
+                    </label>
+                    <input type="number" id="ingredientContent" class="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-base" 
+                        step="0.01" min="0" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" for="ingredientPrice">
+                        Preço Unitário (R$)
+                    </label>
+                    <input type="number" id="ingredientPrice" class="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-base" 
+                        step="0.01" min="0" required>
+                </div>
+                
+                <div class="flex justify-end space-x-2">
+                    <button type="button" id="cancelIngredientBtn" class="bg-gray-300 hover:bg-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-white px-4 py-2 rounded">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded">
+                        Salvar Ingrediente
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Receita -->
+    <div id="recipeModal" class="hidden fixed inset-0 z-50 overflow-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg max-w-2xl w-full">
+            <div class="flex justify-between items-center p-4 border-b dark:border-gray-700">
+                <h3 class="text-lg font-bold text-gray-800 dark:text-white" id="recipeModalTitle">Adicionar Receita</h3>
+                <button class="text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-gray-100" id="closeRecipeModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="recipeForm" class="p-4">
+                <input type="hidden" id="recipeId">
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" for="recipeName">
+                            Nome da Receita
+                        </label>
+                        <input type="text" id="recipeName" class="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-base" required>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" for="recipeProduction">
+                            Produção Total (unidades)
+                        </label>
+                        <input type="number" id="recipeProduction" class="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-base" 
+                            min="1" required>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" for="recipeTime">
+                            Tempo de Produção (minutos)
+                        </label>
+                        <input type="number" id="recipeTime" class="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-base" 
+                            min="1" required>
+                    </div>
+                </div>
+                
+                <h4 class="font-bold mb-2 text-gray-800 dark:text-white">Ingredientes da Receita</h4>
+                
+                <div class="mb-3 overflow-y-auto max-h-60 bg-gray-50 dark:bg-gray-700 rounded p-2">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+                        <thead>
+                            <tr class="text-gray-700 dark:text-gray-300">
+                                <th class="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider">Ingrediente</th>
+                                <th class="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider">Unidade</th>
+                                <th class="px-2 py-2 text-right text-xs font-medium uppercase tracking-wider">Quantidade</th>
+                                <th class="px-2 py-2 text-right text-xs font-medium uppercase tracking-wider">Custo</th>
+                                <th class="px-2 py-2 text-center text-xs font-medium uppercase tracking-wider">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recipeIngredientsTable" class="divide-y divide-gray-200 dark:divide-gray-600">
+                            <!-- Ingredientes serão adicionados aqui dinamicamente -->
+                            <tr>
+                                <td colspan="5" class="text-center py-4 text-gray-500 dark:text-gray-400">
+                                    Nenhum ingrediente adicionado
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" for="recipeIngredient">
+                            Ingrediente
+                        </label>
+                        <select id="recipeIngredient" class="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-base">
+                            <option value="">Selecione um ingrediente</option>
+                            <!-- Opções serão adicionadas dinamicamente -->
+                        </select>
+                    </div>
+                    
+                    <!-- Área para detalhes do ingrediente -->
+                    <div id="ingredientDetails" class="hidden mb-2 text-sm text-gray-600 dark:text-gray-400">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" for="recipeIngredientQuantity">
+                            Quantidade
+                        </label>
+                        <input type="number" id="recipeIngredientQuantity" class="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-base" 
+                            step="0.01" min="0">
+                    </div>
+                    
+                    <div class="flex items-end">
+                        <button type="button" id="addRecipeIngredientBtn" class="bg-primary hover:bg-primary-dark text-white px-3 py-2 rounded w-full">
+                            <i class="fas fa-plus mr-1"></i> Adicionar Ingrediente
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="bg-gray-100 dark:bg-gray-700 p-3 rounded mb-4">
+                    <div class="flex justify-between">
+                        <p class="font-medium text-gray-700 dark:text-gray-300">Custo Total de Materiais:</p>
+                        <p class="font-bold text-gray-800 dark:text-white">R$ <span id="recipeTotalCost">0,00</span></p>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end space-x-2">
+                    <button type="button" id="cancelRecipeBtn" class="bg-gray-300 hover:bg-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-white px-4 py-2 rounded">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded">
+                        Salvar Receita
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Transação -->
+    <div id="transactionModal" class="hidden fixed inset-0 z-50 overflow-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg max-w-md w-full">
+            <div class="flex justify-between items-center p-4 border-b dark:border-gray-700">
+                <h3 class="text-lg font-bold text-gray-800 dark:text-white" id="transactionModalTitle">Nova Transação</h3>
+                <button class="text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-gray-100" id="closeTransactionModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="transactionForm" class="p-4">
+                <input type="hidden" id="transactionId">
+                
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" for="transactionDate">
+                        Data
+                    </label>
+                    <input type="date" id="transactionDate" class="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-base" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" for="transactionDescription">
+                        Descrição
+                    </label>
+                    <input type="text" id="transactionDescription" class="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-base" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" for="transactionType">
+                        Tipo
+                    </label>
+                    <select id="transactionType" class="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-base" required>
+                        <option value="income">Receita</option>
+                        <option value="expense">Despesa</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" for="transactionAmount">
+                        Valor (R$)
+                    </label>
+                    <input type="number" id="transactionAmount" class="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-base" 
+                        step="0.01" min="0" required>
+                </div>
+                
+                <div class="flex justify-end space-x-2">
+                    <button type="button" id="cancelTransactionBtn" class="bg-gray-300 hover:bg-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-white px-4 py-2 rounded">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded">
+                        Salvar Transação
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Script principal -->
+    <script>
+        // Objetos de dados
+        const Storage = {
+            // Chaves de armazenamento
+            keys: {
+                ingredients: 'geladao_ingredients',
+                recipes: 'geladao_recipes',
+                costs: 'geladao_costs',
+                labor: 'geladao_labor',
+                transactions: 'geladao_transactions',
+				pricingConfig: 'geladao_pricing_config' 
+            },
+            
+            // Salvar dados no localStorage
+            save: function(key, data) {
+                localStorage.setItem(key, JSON.stringify(data));
+            },
+            
+            // Recuperar dados do localStorage
+            get: function(key) {
+                const data = localStorage.getItem(key);
+                return data ? JSON.parse(data) : null;
+            },
+            
+            // Carregar dados ou retornar o valor padrão
+            load: function(key, defaultValue) {
+                const data = this.get(key);
+                return data !== null ? data : defaultValue;
+            },
+            
+            // Gerar um ID único
+            generateId: function() {
+                return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+            },
+            
+            // Inicializar armazenamento com valores predefinidos
+            initialize: function() {
+                // Verificar e configurar ingredientes padrão
+                if (!this.get(this.keys.ingredients)) {
+                    const defaultIngredients = [
+                        { id: this.generateId(), name: 'ABACAXI QUADRADO', category: 'frutas', unit: 'g', content: 1000, price: 15.00 },
+                        { id: this.generateId(), name: 'ABACAXI', category: 'frutas', unit: 'g', content: 1500, price: 10.00 },
+                        { id: this.generateId(), name: 'AÇÚCAR DE CONFEITEIRO', category: 'outros', unit: 'g', content: 500, price: 3.39 },
+                        { id: this.generateId(), name: 'AÇÚCAR', category: 'outros', unit: 'g', content: 1000, price: 3.79 },
+                        { id: this.generateId(), name: 'ADESIVO CHOCO', category: 'embalagens', unit: 'und', content: 42.00, price: 7.00 },
+                        { id: this.generateId(), name: 'ADESIVO', category: 'embalagens', unit: 'und', content: 1000, price: 90.00 },
+                        { id: this.generateId(), name: 'ADESIVO/SACO HIGIENICO', category: 'embalagens', unit: 'und', content: 200.00, price: 200.00 },
+                        { id: this.generateId(), name: 'AIPIM RALADO', category: 'vegetais', unit: 'g', content: 1000, price: 5.00 },
+                        { id: this.generateId(), name: 'AIPIM', category: 'vegetais', unit: 'g', content: 1000, price: 2.50 },
+                        { id: this.generateId(), name: 'AQUA 5', category: 'outros', unit: 'g', content: 1300, price: 61.00 },
+                        { id: this.generateId(), name: 'BANANA', category: 'frutas', unit: 'und', content: 12.00, price: 5.00 },
+                        { id: this.generateId(), name: 'BASE DE AÇAÍ', category: 'bases', unit: 'g', content: 1000, price: 37.70 },
+                        { id: this.generateId(), name: 'BASE DE AMENDOIM', category: 'bases', unit: 'g', content: 1000, price: 40.70 },
+                        { id: this.generateId(), name: 'BASE DE COCO', category: 'bases', unit: 'g', content: 1000, price: 24.70 },
+                        { id: this.generateId(), name: 'BASE DE DOCE DE LEITE', category: 'bases', unit: 'g', content: 1000, price: 35.00 },
+                        { id: this.generateId(), name: 'BASE DE LIMÃO', category: 'bases', unit: 'g', content: 1000, price: 38.00 },
+                        { id: this.generateId(), name: 'BASE DE MARACUJÁ', category: 'bases', unit: 'g', content: 1000, price: 32.10 },
+                        { id: this.generateId(), name: 'BASE DE MORANGO', category: 'bases', unit: 'g', content: 1000, price: 24.10 },
+                        { id: this.generateId(), name: 'BASE DE PALMA', category: 'bases', unit: 'g', content: 3200, price: 79.00 },
+                        { id: this.generateId(), name: 'BASE LEITINHO', category: 'bases', unit: 'g', content: 1000, price: 32.00 },
+                        { id: this.generateId(), name: 'BASE LIQUIDA DE COCO', category: 'bases', unit: 'ml', content: 970, price: 27.00 },
+                        { id: this.generateId(), name: 'BAUNILHA', category: 'outros', unit: 'g', content: 200, price: 24.00 },
+                        { id: this.generateId(), name: 'BRIGADEIRO', category: 'outros', unit: 'g', content: 560, price: 11.63 },
+                        { id: this.generateId(), name: 'CALDA DE AÇUCAR', category: 'outros', unit: 'g', content: 250, price: 0.95 },
+                        { id: this.generateId(), name: 'CHANTILLY PÓ', category: 'outros', unit: 'g', content: 400, price: 17.90 },
+                        { id: this.generateId(), name: 'CHANTILLY', category: 'outros', unit: 'ml', content: 1000, price: 21.00 },
+                        { id: this.generateId(), name: 'CHOCOLATE AO LEITE', category: 'outros', unit: 'g', content: 1000, price: 55.00 },
+                        { id: this.generateId(), name: 'CHOCOLATE BRANCO', category: 'outros', unit: 'g', content: 1000, price: 56.00 },
+                        { id: this.generateId(), name: 'CHOCOLATE MEIO AMARGO', category: 'outros', unit: 'g', content: 1000, price: 55.00 },
+                        { id: this.generateId(), name: 'CHOCOLATE MELKEN', category: 'outros', unit: 'g', content: 1000, price: 55.00 },
+                        { id: this.generateId(), name: 'CHOCOLATE PÓ 50%', category: 'outros', unit: 'g', content: 1000, price: 42.90 },
+                        { id: this.generateId(), name: 'CHOCOLATE', category: 'outros', unit: 'g', content: 500, price: 29.00 },
+                        { id: this.generateId(), name: 'COCO RALADO', category: 'outros', unit: 'g', content: 680, price: 6.00 },
+                        { id: this.generateId(), name: 'COLHER', category: 'embalagens', unit: 'und', content: 100, price: 30.00 },
+                        { id: this.generateId(), name: 'CREME DE CHOCOLATE', category: 'outros', unit: 'g', content: 500, price: 12.00 },
+                        { id: this.generateId(), name: 'CREME DE LEITE', category: 'bases', unit: 'g', content: 200, price: 3.39 },
+                        { id: this.generateId(), name: 'CREME DE LIMÃO', category: 'outros', unit: 'g', content: 486, price: 10.00 },
+                        { id: this.generateId(), name: 'DEXTROSE', category: 'outros', unit: 'g', content: 1000, price: 45.00 },
+                        { id: this.generateId(), name: 'DIAMANTE NEGRO BASE', category: 'outros', unit: 'g', content: 1005, price: 47.50 },
+                        { id: this.generateId(), name: 'DOCE DE LEITE 2', category: 'outros', unit: 'g', content: 1000, price: 29.00 },
+                        { id: this.generateId(), name: 'DOCE DE LEITE', category: 'outros', unit: 'g', content: 350, price: 8.90 },
+                        { id: this.generateId(), name: 'EMBALAGEM', category: 'embalagens', unit: 'und', content: 50, price: 70.00 },
+                        { id: this.generateId(), name: 'EMULSIFICANTE', category: 'outros', unit: 'g', content: 1000, price: 31.00 },
+                        { id: this.generateId(), name: 'ESSÊNCIA DE BAUNILHA', category: 'outros', unit: 'ml', content: 30, price: 4.50 },
+                        { id: this.generateId(), name: 'ETIQUETA', category: 'embalagens', unit: 'und', content: 230, price: 14.24 },
+                        { id: this.generateId(), name: 'FARINHA DE TRIGO', category: 'outros', unit: 'g', content: 1000, price: 4.69 },
+                        { id: this.generateId(), name: 'FARINHA', category: 'outros', unit: 'g', content: 1000, price: 4.00 },
+                        { id: this.generateId(), name: 'FERMENTO', category: 'outros', unit: 'g', content: 200, price: 4.50 },
+                        { id: this.generateId(), name: 'FITA', category: 'embalagens', unit: 'cm', content: 1000, price: 30.00 },
+                        { id: this.generateId(), name: 'FORTE BASE 2.0', category: 'bases', unit: 'g', content: 1300, price: 54.90 },
+                        { id: this.generateId(), name: 'GARRAFA', category: 'embalagens', unit: 'und', content: 10, price: 13.80 },
+                        { id: this.generateId(), name: 'GELATINA', category: 'outros', unit: 'g', content: 48, price: 5.60 },
+                        { id: this.generateId(), name: 'GELATO LATTE', category: 'outros', unit: 'g', content: 800, price: 39.90 },
+                        { id: this.generateId(), name: 'GELEIA DE MARACUJÁ', category: 'outros', unit: 'g', content: 596, price: 6.00 },
+                        { id: this.generateId(), name: 'GELEIA DE MORANGO 2', category: 'outros', unit: 'g', content: 250, price: 3.45 },
+                        { id: this.generateId(), name: 'GELEIA DE MORANGO', category: 'outros', unit: 'g', content: 950, price: 18.00 },
+                        { id: this.generateId(), name: 'GLUCOSE', category: 'outros', unit: 'g', content: 1000, price: 16.00 },
+                        { id: this.generateId(), name: 'GUARDANAPO KIT', category: 'embalagens', unit: 'und', content: 1000, price: 39.00 },
+                        { id: this.generateId(), name: 'GUARDANAPO', category: 'embalagens', unit: 'und', content: 50, price: 0.89 },
+                        { id: this.generateId(), name: 'LAÇO JUNINO', category: 'embalagens', unit: 'und', content: 100, price: 20.00 },
+						{ id: this.generateId(), name: 'LEITE CONDENSADO', category: 'bases', unit: 'g', content: 395, price: 5.50 },
+                        { id: this.generateId(), name: 'LEITE DE COCO', category: 'outros', unit: 'ml', content: 200, price: 2.85 },
+                        { id: this.generateId(), name: 'LEITE EM PÓ', category: 'bases', unit: 'g', content: 175, price: 7.60 },
+                        { id: this.generateId(), name: 'LEITE UHT', category: 'bases', unit: 'ml', content: 1000, price: 5.00 },
+                        { id: this.generateId(), name: 'MANTEIGA', category: 'outros', unit: 'g', content: 200, price: 21.00 },
+                        { id: this.generateId(), name: 'MARGARINA', category: 'outros', unit: 'g', content: 3000, price: 159.00 },
+                        { id: this.generateId(), name: 'NUTELLA', category: 'outros', unit: 'g', content: 350, price: 21.00 },
+                        { id: this.generateId(), name: 'OLÉO DE COCO', category: 'outros', unit: 'ml', content: 500, price: 42.00 },
+                        { id: this.generateId(), name: 'ÓLEO', category: 'outros', unit: 'l', content: 1000, price: 7.50 },
+                        { id: this.generateId(), name: 'OREO BISCOITO', category: 'outros', unit: 'g', content: 270, price: 8.99 },
+                        { id: this.generateId(), name: 'OREO2', category: 'outros', unit: 'g', content: 90, price: 3.25 },
+                        { id: this.generateId(), name: 'OVOS', category: 'outros', unit: 'und', content: 30, price: 27.00 },
+                        { id: this.generateId(), name: 'PAÇOCA', category: 'outros', unit: 'g', content: 750, price: 17.00 },
+                        { id: this.generateId(), name: 'POLPA MARACUJÁ', category: 'outros', unit: 'ml', content: 200, price: 4.00 },
+                        { id: this.generateId(), name: 'POTE BOLO', category: 'embalagens', unit: 'und', content: 50, price: 22.50 },
+                        { id: this.generateId(), name: 'PUBA', category: 'outros', unit: 'g', content: 1000, price: 5.00 },
+                        { id: this.generateId(), name: 'QUEIJO RALADO', category: 'outros', unit: 'g', content: 100, price: 3.00 },
+                        { id: this.generateId(), name: 'SACO BOOP HIGIENICO', category: 'embalagens', unit: 'und', content: 36000, price: 2100.00 },
+                        { id: this.generateId(), name: 'SACO DE GELADINHO 6X26', category: 'embalagens', unit: 'und', content: 500, price: 22.00 },
+                        { id: this.generateId(), name: 'SACO DE PAPEL', category: 'embalagens', unit: 'und', content: 100, price: 34.90 },
+                        { id: this.generateId(), name: 'SACO KRAFT', category: 'embalagens', unit: 'und', content: 100, price: 42.00 },
+                        { id: this.generateId(), name: 'SACO TÉRMICO', category: 'embalagens', unit: 'und', content: 500, price: 104.00 },
+                        { id: this.generateId(), name: 'SACO', category: 'embalagens', unit: 'g', content: 356, price: 10.07 },
+                        { id: this.generateId(), name: 'SACOLA DE TRANSPORTE', category: 'embalagens', unit: 'g', content: 242, price: 5.18 },
+                        { id: this.generateId(), name: 'SAL', category: 'outros', unit: 'g', content: 1000, price: 3.00 },
+                        { id: this.generateId(), name: 'SUCO DE LIMÃO', category: 'outros', unit: 'ml', content: 300, price: 2.00 },
+                        { id: this.generateId(), name: 'TANG', category: 'outros', unit: 'und', content: 1, price: 1.00 },
+                        { id: this.generateId(), name: 'TAPIOCA GRANULADA', category: 'outros', unit: 'g', content: 500, price: 7.00 }
+
+                    ];
+                    
+                    this.save(this.keys.ingredients, defaultIngredients);
+                }
+                
+                // Verificar e configurar custos fixos padrão
+                if (!this.get(this.keys.costs)) {
+                    const defaultCosts = [
+                        { id: this.generateId(), name: 'Água', value: 61.00, divideWithHome: true },
+						{ id: this.generateId(), name: 'Combustível/Condução', value: 30.00, divideWithHome: false},
+                        { id: this.generateId(), name: 'Gás', value: 120.00, divideWithHome: true },
+	                    { id: this.generateId(), name: 'Internet/Telefone', value: 30.00, divideWithHome: false },					
+	                    { id: this.generateId(), name: 'Insumos de Apoio e Higiene', value: 10.00, divideWithHome: false },	
+						{ id: this.generateId(), name: 'Investimentos futuro da empresa', value: 100.00, divideWithHome: false },
+                        { id: this.generateId(), name: 'Impostos do CNPJ', value: 72.00, divideWithHome: false },
+						{ id: this.generateId(), name: 'Luz', value: 300.00, divideWithHome: true },
+						{ id: this.generateId(), name: 'Recompensa para clientes', value: 40.00, divideWithHome: false }
+                        
+                    ];
+                    
+                    this.save(this.keys.costs, defaultCosts);
+                }
+                
+                // Verificar e configurar dados de mão de obra
+                if (!this.get(this.keys.labor)) {
+                    const defaultLabor = {
+                        monthlySalary: 1500.00,
+                        workDaysPerMonth: 25,
+                        workHoursPerDay: 8
+                    };
+                    
+                    this.save(this.keys.labor, defaultLabor);
+                }
+                
+                // Verificar e configurar receitas padrão
+                if (!this.get(this.keys.recipes)) {
+                    this.save(this.keys.recipes, []);
+                }
+                
+                // Verificar e configurar transações
+                if (!this.get(this.keys.transactions)) {
+                    this.save(this.keys.transactions, []);
+                }
+            }
+        };
+
+        const Ingredients = {
+            items: [],
+            
+            // Inicializar o módulo
+            init: function() {
+                this.loadIngredients();
+                this.renderIngredientsTable();
+            },
+            
+            // Carregar ingredientes do armazenamento
+            loadIngredients: function() {
+                this.items = Storage.load(Storage.keys.ingredients, []);
+            },
+            
+            // Abrir modal para adicionar/editar ingrediente
+            openIngredientModal: function(ingredientId = null) {
+                const modal = document.getElementById('ingredientModal');
+                const modalTitle = document.getElementById('ingredientModalTitle');
+                const form = document.getElementById('ingredientForm');
+                
+                // Limpar formulário
+                form.reset();
+                
+                if (ingredientId) {
+                    // Modo de edição
+                    const ingredient = this.findIngredientById(ingredientId);
+                    
+                    if (ingredient) {
+                        modalTitle.textContent = 'Editar Ingrediente';
+                        
+                        // Preencher formulário
+                        document.getElementById('ingredientId').value = ingredient.id;
+                        document.getElementById('ingredientName').value = ingredient.name;
+                        document.getElementById('ingredientCategoryInput').value = ingredient.category;
+                        document.getElementById('ingredientUnit').value = ingredient.unit;
+                        document.getElementById('ingredientContent').value = ingredient.content;
+                        document.getElementById('ingredientPrice').value = ingredient.price;
+                    }
+                } else {
+                    // Modo de adição
+                    modalTitle.textContent = 'Adicionar Ingrediente';
+                    document.getElementById('ingredientId').value = '';
+                }
+                
+                // Exibir modal
+                modal.classList.remove('hidden');
+                console.log('Modal de ingrediente aberto');
+            },
+			
+						// Função para abrir a modal de edição de transação
+			openTransactionModal: function(transactionId = null) {
+				const modal = document.getElementById('transactionModal');
+				const form = document.getElementById('transactionForm');
+				
+				// Limpar formulário
+				form.reset();
+				
+				if (transactionId) {
+					// Modo de edição
+					const transaction = this.transactions.find(item => item.id === transactionId);
+					
+					if (transaction) {
+						document.getElementById('transactionId').value = transaction.id;
+						document.getElementById('transactionDate').value = transaction.date;
+						document.getElementById('transactionDescription').value = transaction.description;
+						document.getElementById('transactionType').value = transaction.type;
+						document.getElementById('transactionAmount').value = transaction.amount.toFixed(2);
+					}
+				} else {
+					// Modo de adição
+					document.getElementById('transactionId').value = '';
+				}
+				
+				// Exibir modal
+				modal.classList.remove('hidden');
+			},
+						
+            // Fechar modal de ingrediente
+            closeIngredientModal: function() {
+                document.getElementById('ingredientModal').classList.add('hidden');
+            },
+            
+            // Salvar ingrediente (novo ou editado)
+            saveIngredient: function() {
+                const id = document.getElementById('ingredientId').value;
+                const name = document.getElementById('ingredientName').value.trim().toUpperCase();
+                const category = document.getElementById('ingredientCategoryInput').value;
+                const unit = document.getElementById('ingredientUnit').value;
+                const content = parseFloat(document.getElementById('ingredientContent').value);
+                const price = parseFloat(document.getElementById('ingredientPrice').value);
+                
+                if (!name || isNaN(content) || isNaN(price)) {
+                    App.showNotification('Preencha todos os campos corretamente', 'error');
+                    return;
+                }
+                
+                // Criar ou atualizar ingrediente
+                if (id) {
+                    // Editar existente
+                    const index = this.items.findIndex(item => item.id === id);
+                    
+                    if (index !== -1) {
+                        this.items[index] = { 
+                            id, 
+                            name, 
+                            category, 
+                            unit, 
+                            content, 
+                            price,
+                            updatedAt: new Date().toISOString()
+                        };
+                        
+                        App.showNotification('Ingrediente atualizado com sucesso', 'success');
+                    }
+                } else {
+                    // Adicionar novo
+                    const newIngredient = {
+                        id: Storage.generateId(),
+                        name,
+                        category,
+                        unit,
+                        content,
+                        price,
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString()
+                    };
+                    
+                    this.items.push(newIngredient);
+                    App.showNotification('Ingrediente adicionado com sucesso', 'success');
+                }
+                
+                // Salvar no armazenamento
+                Storage.save(Storage.keys.ingredients, this.items);
+                
+                // Atualizar interface
+                this.renderIngredientsTable();
+                
+                // Atualizar preços e receitas
+                Recipes.updateRecipeCosts();
+                Pricing.updatePricing();
+                
+                // Fechar modal
+                this.closeIngredientModal();
+            },
+            
+            // Excluir ingrediente
+            deleteIngredient: function(id) {
+                // Verificar se o ingrediente está sendo usado em receitas
+                const recipes = Storage.load(Storage.keys.recipes, []);
+                const usedInRecipe = recipes.some(recipe => 
+                    recipe.ingredients.some(ingredient => ingredient.id === id)
+                );
+                
+                if (usedInRecipe) {
+                    App.showNotification('Este ingrediente está sendo usado em receitas e não pode ser excluído', 'error');
+                    return;
+                }
+                
+                if (confirm('Tem certeza que deseja excluir este ingrediente?')) {
+                    this.items = this.items.filter(item => item.id !== id);
+                    Storage.save(Storage.keys.ingredients, this.items);
+                    this.renderIngredientsTable();
+                    App.showNotification('Ingrediente excluído com sucesso', 'success');
+                }
+            },
+            
+            // Encontrar ingrediente por ID
+            findIngredientById: function(id) {
+                return this.items.find(item => item.id === id);
+            },
+            
+            // Renderizar tabela de ingredientes
+            renderIngredientsTable: function() {
+                const tableBody = document.getElementById('ingredientsTable');
+                
+                if (this.items.length === 0) {
+                    tableBody.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="text-center py-4 text-gray-500 dark:text-gray-400">
+                                Nenhum ingrediente registrado
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+                
+                // Filtrar ingredientes
+                this.filterIngredients();
+            },
+            
+            // Filtrar ingredientes
+            filterIngredients: function() {
+                const searchTerm = document.getElementById('ingredientSearch').value.trim().toLowerCase();
+                const categoryFilter = document.getElementById('ingredientCategory').value;
+                
+                const filteredItems = this.items.filter(item => {
+                    const nameMatch = item.name.toLowerCase().includes(searchTerm);
+                    const categoryMatch = !categoryFilter || item.category === categoryFilter;
+                    
+                    return nameMatch && categoryMatch;
+                });
+                
+                const tableBody = document.getElementById('ingredientsTable');
+                
+                if (filteredItems.length === 0) {
+                    tableBody.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="text-center py-4 text-gray-500 dark:text-gray-400">
+                                Nenhum ingrediente encontrado
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+                
+                // Ordenar por nome
+                filteredItems.sort((a, b) => a.name.localeCompare(b.name));
+                
+                let html = '';
+                
+                filteredItems.forEach(ingredient => {
+                    // Verificar se o preço foi atualizado nos últimos 30 dias
+                    const isOutdated = ingredient.updatedAt ? new Date(ingredient.updatedAt) < new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) : false;
+                    
+                    html += `
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-750">
+                            <td class="px-4 py-3">
+                                <div class="flex items-center">
+                                    <span class="${isOutdated ? 'text-red-600 dark:text-red-400' : ''}">${ingredient.name}</span>
+                                    ${isOutdated ? '<i class="fas fa-exclamation-circle text-red-600 dark:text-red-400 ml-2" title="Preço desatualizado"></i>' : ''}
+                                </div>
+                            </td>
+                            <td class="px-4 py-3">${this.getCategoryName(ingredient.category)}</td>
+                            <td class="px-4 py-3">${ingredient.unit}</td>
+                            <td class="px-4 py-3 text-right">${ingredient.content.toLocaleString('pt-BR')}</td>
+                            <td class="px-4 py-3 text-right">R$ ${ingredient.price.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td class="px-4 py-3 text-center">
+                                <button onclick="Ingredients.openIngredientModal('${ingredient.id}')" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 mx-1">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button onclick="Ingredients.deleteIngredient('${ingredient.id}')" class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 mx-1">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                tableBody.innerHTML = html;
+            },
+            
+            // Obter nome da categoria
+            getCategoryName: function(category) {
+                const categories = {
+                    'frutas': 'Frutas',
+                    'bases': 'Bases',
+                    'embalagens': 'Embalagens',
+                    'outros': 'Outros'
+                };
+                
+                return categories[category] || 'Outros';
+            },
+            
+            // Obter custo de ingrediente por unidade
+            getIngredientUnitCost: function(ingredientId, quantity) {
+                const ingredient = this.findIngredientById(ingredientId);
+                
+                if (!ingredient) return 0;
+                
+                // Calcular custo por unidade de medida
+                const unitCost = ingredient.price / ingredient.content;
+                
+                return unitCost * quantity;
+            },
+            
+            // Obter todos os ingredientes para seleção
+            getIngredientsForSelect: function() {
+                // Ordenar por nome
+                return [...this.items].sort((a, b) => a.name.localeCompare(b.name));
+            }
+        };
+
+        const Labor = {
+            data: {
+                monthlySalary: 2500.00,
+                workDaysPerMonth: 30,
+                workHoursPerDay: 12
+            },
+            
+            calculated: {
+                totalHoursPerMonth: 360,
+                salaryPerDay: 83.33,
+                salaryPerHour: 6.94,
+                salaryPerMinute: 0.12
+            },
+            
+            // Inicializar o módulo
+            init: function() {
+                this.loadData();
+                this.calculateValues();
+                this.updateUI();
+            },
+            
+            // Carregar dados do armazenamento
+            loadData: function() {
+                const saved = Storage.load(Storage.keys.labor, null);
+                
+                if (saved) {
+                    this.data = saved;
+                }
+            },
+            
+            // Salvar dados de mão de obra
+            saveData: function() {
+                const monthlySalary = parseFloat(document.getElementById('monthlySalary').value);
+                const workDaysPerMonth = parseInt(document.getElementById('workDaysPerMonth').value);
+                const workHoursPerDay = parseInt(document.getElementById('workHoursPerDay').value);
+                
+                if (isNaN(monthlySalary) || isNaN(workDaysPerMonth) || isNaN(workHoursPerDay)) {
+                    App.showNotification('Preencha todos os campos corretamente', 'error');
+                    return;
+                }
+                
+                this.data.monthlySalary = monthlySalary;
+                this.data.workDaysPerMonth = workDaysPerMonth;
+                this.data.workHoursPerDay = workHoursPerDay;
+                
+                Storage.save(Storage.keys.labor, this.data);
+                
+                this.calculateValues();
+                this.updateUI();
+                
+                // Atualizar precificação
+                Pricing.updatePricing();
+                
+                App.showNotification('Configurações de mão de obra salvas com sucesso', 'success');
+            },
+            
+            // Calcular valores derivados
+            calculateValues: function() {
+                // Total de horas trabalhadas por mês
+                this.calculated.totalHoursPerMonth = this.data.workDaysPerMonth * this.data.workHoursPerDay;
+                
+                // Valor do salário-dia
+                this.calculated.salaryPerDay = this.data.monthlySalary / this.data.workDaysPerMonth;
+                
+                // Valor do prolabore-hora
+                this.calculated.salaryPerHour = this.data.monthlySalary / this.calculated.totalHoursPerMonth;
+                
+                // Valor do prolabore-minuto
+                this.calculated.salaryPerMinute = this.calculated.salaryPerHour / 60;
+            },
+            
+            // Atualizar UI com os valores calculados
+            updateUI: function() {
+                // Preencher formulário
+                document.getElementById('monthlySalary').value = this.data.monthlySalary.toFixed(2);
+                document.getElementById('workDaysPerMonth').value = this.data.workDaysPerMonth;
+                document.getElementById('workHoursPerDay').value = this.data.workHoursPerDay;
+                
+                // Atualizar valores calculados
+                document.getElementById('totalHoursPerMonth').textContent = this.calculated.totalHoursPerMonth;
+                document.getElementById('salaryPerDay').textContent = this.calculated.salaryPerDay.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                document.getElementById('salaryPerHour').textContent = this.calculated.salaryPerHour.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                document.getElementById('salaryPerMinute').textContent = this.calculated.salaryPerMinute.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+            },
+            
+            // Obter custo de mão de obra por minuto
+            getLaborCostPerMinute: function() {
+                return this.calculated.salaryPerMinute;
+            }
+        };
+
+        const Costs = {
+            items: [],
+            calculated: {
+                totalMonthlyCost: 0,
+                costPerDay: 0,
+                costPerHour: 0,
+                costPerMinute: 0
+            },
+            
+            // Inicializar o módulo
+            init: function() {
+                this.loadCosts();
+                this.renderCostsTable();
+                this.calculateFixedCosts();
+                this.updateUI();
+            },
+            
+            // Carregar custos do armazenamento
+            loadCosts: function() {
+                this.items = Storage.load(Storage.keys.costs, []);
+            },
+            
+            // Salvar custo fixo
+            saveCost: function() {
+                const id = document.getElementById('costId').value;
+                const name = document.getElementById('costName').value.trim();
+                const value = parseFloat(document.getElementById('costValue').value);
+                const divideWithHome = document.getElementById('divideWithHome').checked;
+                
+                if (!name || isNaN(value)) {
+                    App.showNotification('Preencha todos os campos corretamente', 'error');
+                    return;
+                }
+                
+                if (id) {
+                    // Editar existente
+                    const index = this.items.findIndex(item => item.id === id);
+                    
+                    if (index !== -1) {
+                        this.items[index] = { id, name, value, divideWithHome };
+                        App.showNotification('Custo fixo atualizado com sucesso', 'success');
+                    }
+                } else {
+                    // Adicionar novo
+                    const newCost = {
+                        id: Storage.generateId(),
+                        name,
+                        value,
+                        divideWithHome
+                    };
+                    
+                    this.items.push(newCost);
+                    App.showNotification('Custo fixo adicionado com sucesso', 'success');
+                }
+                
+                // Salvar no armazenamento
+                Storage.save(Storage.keys.costs, this.items);
+                
+                // Atualizar interface
+                this.renderCostsTable();
+                this.calculateFixedCosts();
+                this.updateUI();
+                
+                // Atualizar precificação
+                Pricing.updatePricing();
+                
+                // Resetar formulário
+                this.resetCostForm();
+            },
+            
+            // Editar custo
+            editCost: function(id) {
+                const cost = this.items.find(item => item.id === id);
+                
+                if (cost) {
+                    document.getElementById('costId').value = cost.id;
+                    document.getElementById('costName').value = cost.name;
+                    document.getElementById('costValue').value = cost.value.toFixed(2);
+                    document.getElementById('divideWithHome').checked = cost.divideWithHome;
+                }
+            },
+            
+            // Excluir custo
+            deleteCost: function(id) {
+                if (confirm('Tem certeza que deseja excluir este custo fixo?')) {
+                    this.items = this.items.filter(item => item.id !== id);
+                    Storage.save(Storage.keys.costs, this.items);
+                    
+                    this.renderCostsTable();
+                    this.calculateFixedCosts();
+                    this.updateUI();
+                    
+                    // Atualizar precificação
+                    Pricing.updatePricing();
+                    
+                    App.showNotification('Custo fixo excluído com sucesso', 'success');
+                }
+            },
+            
+            // Resetar formulário de custo
+            resetCostForm: function() {
+                document.getElementById('costId').value = '';
+                document.getElementById('costName').value = '';
+                document.getElementById('costValue').value = '';
+                document.getElementById('divideWithHome').checked = false;
+            },
+            
+            // Renderizar tabela de custos
+            renderCostsTable: function() {
+                const tableBody = document.getElementById('costsTable');
+                
+                if (this.items.length === 0) {
+                    tableBody.innerHTML = `
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-gray-500 dark:text-gray-400">
+                                Nenhum custo fixo registrado
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+                
+                let html = '';
+                
+                this.items.forEach(cost => {
+                    // Calcular valor aplicado à produção (metade se divide com casa)
+                    const productionCost = cost.divideWithHome ? cost.value / 2 : cost.value;
+                    
+                    html += `
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-750">
+                            <td class="px-4 py-3">${cost.name}</td>
+                            <td class="px-4 py-3 text-right">R$ ${cost.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td class="px-4 py-3 text-center">${cost.divideWithHome ? 'SIM' : 'NÃO'}</td>
+                            <td class="px-4 py-3 text-right">R$ ${productionCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td class="px-4 py-3 text-center">
+                                <button onclick="Costs.editCost('${cost.id}')" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 mx-1">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button onclick="Costs.deleteCost('${cost.id}')" class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 mx-1">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                tableBody.innerHTML = html;
+            },
+            
+            // Calcular custos fixos
+            calculateFixedCosts: function() {
+                // Total mensal ajustado (considerando divisão com casa)
+                this.calculated.totalMonthlyCost = this.items.reduce((total, cost) => {
+                    return total + (cost.divideWithHome ? cost.value / 2 : cost.value);
+                }, 0);
+                
+                // Obter dados de mão de obra (dias e horas)
+                const laborData = Storage.load(Storage.keys.labor, {
+                    workDaysPerMonth: 30,
+                    workHoursPerDay: 12
+                });
+                
+                const daysPerMonth = laborData.workDaysPerMonth;
+                const hoursPerDay = laborData.workHoursPerDay;
+                
+                // Calcular custo por dia, hora e minuto
+                this.calculated.costPerDay = this.calculated.totalMonthlyCost / daysPerMonth;
+                this.calculated.costPerHour = this.calculated.costPerDay / hoursPerDay;
+                this.calculated.costPerMinute = this.calculated.costPerHour / 60;
+            },
+            
+            // Atualizar UI
+            updateUI: function() {
+                document.getElementById('totalMonthlyCost').textContent = this.calculated.totalMonthlyCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                document.getElementById('costPerDay').textContent = this.calculated.costPerDay.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                document.getElementById('costPerHour').textContent = this.calculated.costPerHour.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                document.getElementById('costPerMinute').textContent = this.calculated.costPerMinute.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+            },
+            
+            // Obter custo fixo por minuto
+            getFixedCostPerMinute: function() {
+                return this.calculated.costPerMinute;
+            }
+        };
+
+        const Recipes = {
+            items: [],
+            
+            // Ingredientes temporários da receita sendo editada
+            tempIngredients: [],
+            
+            // Inicializar o módulo
+            init: function() {
+                this.loadRecipes();
+                this.renderRecipesList();
+            },
+            
+            // Carregar receitas do armazenamento
+            loadRecipes: function() {
+                this.items = Storage.load(Storage.keys.recipes, []);
+            },
+            
+            // Abrir modal para adicionar/editar receita
+            openRecipeModal: function(recipeId = null) {
+                const modal = document.getElementById('recipeModal');
+                const modalTitle = document.getElementById('recipeModalTitle');
+                const form = document.getElementById('recipeForm');
+                
+                // Limpar formulário
+                form.reset();
+                this.tempIngredients = [];
+                
+                // Preencher select de ingredientes
+                this.populateIngredientSelect();
+                
+                if (recipeId) {
+                    // Modo de edição
+                    const recipe = this.findRecipeById(recipeId);
+                    
+                    if (recipe) {
+                        modalTitle.textContent = 'Editar Receita';
+                        
+                        // Preencher formulário
+                        document.getElementById('recipeId').value = recipe.id;
+                        document.getElementById('recipeName').value = recipe.name;
+                        document.getElementById('recipeProduction').value = recipe.production;
+                        document.getElementById('recipeTime').value = recipe.time;
+                        
+                        // Copiar os ingredientes para o array temporário
+                        this.tempIngredients = [...recipe.ingredients];
+                    }
+                } else {
+                    // Modo de adição
+                    modalTitle.textContent = 'Adicionar Receita';
+                    document.getElementById('recipeId').value = '';
+                }
+                
+                // Renderizar tabela de ingredientes
+                this.renderRecipeIngredients();
+                
+                // Calcular custo total
+                this.calculateRecipeTotalCost();
+                
+                // Exibir modal
+                modal.classList.remove('hidden');
+                console.log('Modal de receita aberto');
+            },
+            
+            // Preencher select com os ingredientes disponíveis
+            populateIngredientSelect: function() {
+                const select = document.getElementById('recipeIngredient');
+                
+                // Limpar opções existentes
+                select.innerHTML = '<option value="">Selecione um ingrediente</option>';
+                
+                // Adicionar ingredientes ordenados por nome
+                const ingredients = Ingredients.getIngredientsForSelect();
+                
+                ingredients.forEach(ingredient => {
+                    select.innerHTML += `
+                        <option value="${ingredient.id}" 
+                                data-unit="${ingredient.unit}" 
+                                data-content="${ingredient.content}" 
+                                data-price="${ingredient.price}">
+                            ${ingredient.name} (${ingredient.unit})
+                        </option>
+                    `;
+                });
+                
+                // Esconder detalhes do ingrediente
+                const detailsDiv = document.getElementById('ingredientDetails');
+                if (detailsDiv) {
+                    detailsDiv.classList.add('hidden');
+                }
+                
+                // Limpar campo de quantidade
+                document.getElementById('recipeIngredientQuantity').value = '';
+            },
+            
+            // Atualizar detalhes do ingrediente quando selecionado
+            updateIngredientDetails: function() {
+                const select = document.getElementById('recipeIngredient');
+                const detailsDiv = document.getElementById('ingredientDetails');
+                
+                if (!select.value) {
+                    // Esconder detalhes se nenhum ingrediente selecionado
+                    detailsDiv.classList.add('hidden');
+                    return;
+                }
+                
+                // Obter dados do ingrediente selecionado
+                const selectedOption = select.options[select.selectedIndex];
+                const unit = selectedOption.dataset.unit;
+                const content = parseFloat(selectedOption.dataset.content);
+                const price = parseFloat(selectedOption.dataset.price);
+                
+                // Calcular preço unitário
+                const unitPrice = price / content;
+                
+                // Exibir detalhes
+                detailsDiv.innerHTML = `
+                    <div class="bg-gray-100 dark:bg-gray-700 p-2 rounded">
+                        <p><strong>Conteúdo da embalagem:</strong> ${content.toLocaleString('pt-BR')} ${unit}</p>
+                        <p><strong>Preço da embalagem:</strong> R$ ${price.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                        <p><strong>Preço por ${unit}:</strong> R$ ${unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</p>
+                    </div>
+                `;
+                
+                // Mostrar detalhes
+                detailsDiv.classList.remove('hidden');
+                
+                // Focar no campo de quantidade
+                document.getElementById('recipeIngredientQuantity').focus();
+                
+                // Atualizar custo se houver quantidade
+                this.updateIngredientCost();
+            },
+            
+            // Atualizar custo do ingrediente quando quantidade muda
+            updateIngredientCost: function() {
+                const select = document.getElementById('recipeIngredient');
+                const quantityInput = document.getElementById('recipeIngredientQuantity');
+                
+                if (!select.value || !quantityInput.value) {
+                    return;
+                }
+                
+                // Obter dados
+                const ingredientId = select.value;
+                const quantity = parseFloat(quantityInput.value);
+                
+                if (isNaN(quantity) || quantity <= 0) {
+                    return;
+                }
+                
+                // Calcular custo
+                const cost = Ingredients.getIngredientUnitCost(ingredientId, quantity);
+                
+                // Exibir custo
+                const detailsDiv = document.getElementById('ingredientDetails');
+                if (detailsDiv) {
+                    const costInfo = document.createElement('p');
+                    costInfo.innerHTML = `<strong>Custo para ${quantity} ${select.options[select.selectedIndex].dataset.unit}:</strong> <span class="text-green-600 dark:text-green-400 font-bold">R$ ${cost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
+                    
+                    // Substituir informação de custo se já existir
+                    const existingCost = detailsDiv.querySelector('p:last-child');
+                    if (existingCost && existingCost.textContent.includes('Custo para')) {
+                        detailsDiv.querySelector('div').replaceChild(costInfo, existingCost);
+                    } else {
+                        detailsDiv.querySelector('div').appendChild(costInfo);
+                    }
+                }
+            },
+            
+            // Fechar modal de receita
+            closeRecipeModal: function() {
+                document.getElementById('recipeModal').classList.add('hidden');
+            },
+            
+            // Adicionar ingrediente à receita temporária
+            addIngredientToRecipe: function() {
+                const ingredientSelect = document.getElementById('recipeIngredient');
+                const ingredientId = ingredientSelect.value;
+                const quantity = parseFloat(document.getElementById('recipeIngredientQuantity').value);
+                
+                if (!ingredientId || isNaN(quantity) || quantity <= 0) {
+                    App.showNotification('Selecione um ingrediente e informe a quantidade', 'error');
+                    return;
+                }
+                
+                // Encontrar ingrediente selecionado
+                const ingredient = Ingredients.findIngredientById(ingredientId);
+                
+                if (!ingredient) {
+                    App.showNotification('Ingrediente não encontrado', 'error');
+                    return;
+                }
+                
+                // Verificar se o ingrediente já está na lista
+                const existingIndex = this.tempIngredients.findIndex(item => item.id === ingredientId);
+                
+                if (existingIndex !== -1) {
+                    // Atualizar quantidade
+                    this.tempIngredients[existingIndex].quantity = quantity;
+                    App.showNotification('Ingrediente atualizado', 'success');
+                } else {
+                    // Adicionar novo ingrediente
+                    this.tempIngredients.push({
+                        id: ingredientId,
+                        name: ingredient.name,
+                        unit: ingredient.unit,
+                        quantity: quantity,
+                        unitPrice: ingredient.price / ingredient.content
+                    });
+                    App.showNotification('Ingrediente adicionado', 'success');
+                }
+                
+                // Limpar campos
+                ingredientSelect.value = '';
+                document.getElementById('recipeIngredientQuantity').value = '';
+                
+                // Esconder detalhes do ingrediente
+                const detailsDiv = document.getElementById('ingredientDetails');
+                if (detailsDiv) {
+                    detailsDiv.classList.add('hidden');
+                }
+                
+                // Atualizar tabela e custo total
+                this.renderRecipeIngredients();
+                this.calculateRecipeTotalCost();
+            },
+            
+            // Renderizar ingredientes da receita temporária
+            renderRecipeIngredients: function() {
+                const tableBody = document.getElementById('recipeIngredientsTable');
+                
+                if (this.tempIngredients.length === 0) {
+                    tableBody.innerHTML = `
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-gray-500 dark:text-gray-400">
+                                Nenhum ingrediente adicionado
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+                
+                let html = '';
+                
+                this.tempIngredients.forEach((item, index) => {
+                    // Obter custo do ingrediente
+                    const cost = Ingredients.getIngredientUnitCost(item.id, item.quantity);
+                    
+                    html += `
+                        <tr class="hover:bg-gray-100 dark:hover:bg-gray-600">
+                            <td class="px-2 py-2">${item.name}</td>
+                            <td class="px-2 py-2">${item.unit}</td>
+                            <td class="px-2 py-2 text-right">${item.quantity.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td class="px-2 py-2 text-right">R$ ${cost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td class="px-2 py-2 text-center">
+                                <button type="button" onclick="Recipes.removeIngredientFromRecipe(${index})" class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                tableBody.innerHTML = html;
+            },
+            
+            // Remover ingrediente da receita temporária
+            removeIngredientFromRecipe: function(index) {
+                if (index >= 0 && index < this.tempIngredients.length) {
+                    this.tempIngredients.splice(index, 1);
+                    this.renderRecipeIngredients();
+                    this.calculateRecipeTotalCost();
+                }
+            },
+            
+            // Calcular custo total da receita
+            calculateRecipeTotalCost: function() {
+                let totalCost = 0;
+                
+                this.tempIngredients.forEach(item => {
+                    totalCost += Ingredients.getIngredientUnitCost(item.id, item.quantity);
+                });
+                
+                document.getElementById('recipeTotalCost').textContent = totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                
+                return totalCost;
+            },
+            
+            // Salvar receita (nova ou editada)
+            saveRecipe: function() {
+                const id = document.getElementById('recipeId').value;
+                const name = document.getElementById('recipeName').value.trim();
+                const production = parseInt(document.getElementById('recipeProduction').value);
+                const time = parseInt(document.getElementById('recipeTime').value);
+                
+                if (!name || isNaN(production) || production <= 0 || isNaN(time) || time <= 0) {
+                    App.showNotification('Preencha todos os campos corretamente', 'error');
+                    return;
+                }
+                
+                if (this.tempIngredients.length === 0) {
+                    App.showNotification('Adicione pelo menos um ingrediente à receita', 'error');
+                    return;
+                }
+                
+                // Calcular custo total dos materiais
+                const materialCost = this.calculateRecipeTotalCost();
+                
+                // Criar ou atualizar receita
+                if (id) {
+                    // Editar existente
+                    const index = this.items.findIndex(item => item.id === id);
+                    
+                    if (index !== -1) {
+                        this.items[index] = { 
+                            id, 
+                            name, 
+                            production, 
+                            time, 
+                            ingredients: [...this.tempIngredients],
+                            materialCost,
+                            updatedAt: new Date().toISOString()
+                        };
+                        
+                        App.showNotification('Receita atualizada com sucesso', 'success');
+                    }
+                } else {
+                    // Adicionar nova
+                    const newRecipe = {
+                        id: Storage.generateId(),
+                        name,
+                        production,
+                        time,
+                        ingredients: [...this.tempIngredients],
+                        materialCost,
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString()
+                    };
+                    
+                    this.items.push(newRecipe);
+                    App.showNotification('Receita adicionada com sucesso', 'success');
+                }
+                
+                // Salvar no armazenamento
+                Storage.save(Storage.keys.recipes, this.items);
+                
+                // Atualizar interface
+                this.renderRecipesList();
+                
+                // Atualizar pricing
+                Pricing.updatePricing();
+                
+                // Fechar modal
+                this.closeRecipeModal();
+            },
+            
+            // Excluir receita
+            deleteRecipe: function(id) {
+                if (confirm('Tem certeza que deseja excluir esta receita?')) {
+                    this.items = this.items.filter(item => item.id !== id);
+                    Storage.save(Storage.keys.recipes, this.items);
+                    this.renderRecipesList();
+                    
+                    // Atualizar pricing
+                    Pricing.updatePricing();
+                    
+                    App.showNotification('Receita excluída com sucesso', 'success');
+                }
+            },
+            
+            // Encontrar receita por ID
+            findRecipeById: function(id) {
+                return this.items.find(item => item.id === id);
+            },
+            
+            // Filtrar receitas
+            filterRecipes: function() {
+                const searchTerm = document.getElementById('recipeSearch').value.trim().toLowerCase();
+                
+                const filteredItems = this.items.filter(item => {
+                    return item.name.toLowerCase().includes(searchTerm);
+                });
+                
+                this.renderFilteredRecipes(filteredItems);
+            },
+            
+            // Renderizar lista de receitas
+            renderRecipesList: function() {
+                // Mostrar todas as receitas ou filtradas
+                this.renderFilteredRecipes(this.items);
+            },
+            
+            // Renderizar receitas filtradas
+            renderFilteredRecipes: function(recipes) {
+                const container = document.getElementById('recipesList');
+                
+                if (recipes.length === 0) {
+                    container.innerHTML = `
+                        <div class="text-center py-8 text-gray-500 dark:text-gray-400 col-span-full">
+                            Nenhuma receita encontrada
+                        </div>
+                    `;
+                    return;
+                }
+                
+                let html = '';
+                
+                // Ordenar receitas por nome
+                recipes.sort((a, b) => a.name.localeCompare(b.name));
+                
+                recipes.forEach(recipe => {
+                    html += `
+                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 recipe-card">
+                            <div class="flex justify-between items-center mb-3">
+                                <h3 class="font-bold text-gray-800 dark:text-white">${recipe.name}</h3>
+                                <div class="flex">
+                                    <button onclick="Recipes.openRecipeModal('${recipe.id}')" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 mr-2">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button onclick="Recipes.deleteRecipe('${recipe.id}')" class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-2 mb-3">
+                                <div>
+                                    <p class="text-xs text-gray-600 dark:text-gray-400">Produção</p>
+                                    <p class="font-medium text-gray-800 dark:text-white">${recipe.production} unidades</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-600 dark:text-gray-400">Tempo</p>
+                                    <p class="font-medium text-gray-800 dark:text-white">${recipe.time} minutos</p>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <p class="text-xs text-gray-600 dark:text-gray-400">Custo de Materiais</p>
+                                <p class="font-bold text-blue-600 dark:text-blue-400">R$ ${recipe.materialCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                            </div>
+                            
+                            <div>
+                                <p class="text-xs text-gray-600 dark:text-gray-400 mb-1">Ingredientes (${recipe.ingredients.length})</p>
+                                <div class="text-sm text-gray-700 dark:text-gray-300 max-h-16 overflow-y-auto hide-scrollbar">
+                                    ${recipe.ingredients.map(ing => ing.name).join(', ')}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                container.innerHTML = html;
+            },
+            
+            // Atualizar custos de receitas quando os ingredientes mudam
+            updateRecipeCosts: function() {
+                // Para cada receita, recalcular o custo total dos materiais
+                this.items.forEach(recipe => {
+                    let totalCost = 0;
+                    
+                    recipe.ingredients.forEach(ingredient => {
+                        totalCost += Ingredients.getIngredientUnitCost(ingredient.id, ingredient.quantity);
+                    });
+                    
+                    recipe.materialCost = totalCost;
+                });
+                
+                // Salvar as receitas atualizadas
+                Storage.save(Storage.keys.recipes, this.items);
+                
+                // Atualizar a interface
+                this.renderRecipesList();
+            },
+            
+            // Obter lista de receitas para select
+            getRecipesForSelect: function() {
+                // Ordenar por nome
+                return [...this.items].sort((a, b) => a.name.localeCompare(b.name));
+            }
+        };
+
+        const Pricing = {
+    pricingData: [], // Armazena dados de precificação calculados
+    
+    // Inicializar o módulo
+    init: function() {
+        this.updatePricing();
+        this.populateRecipeSelect();
+        
+        // Adicionar event listeners
+        document.getElementById('simulateBtn').addEventListener('click', () => {
+            this.simulatePrice();
+        });
+        
+        document.getElementById('simulatorRecipe').addEventListener('change', () => {
+            this.simulatePrice();
+        });
+    },
+    
+    // Preencher select com as receitas disponíveis
+    populateRecipeSelect: function() {
+        console.log("Populando select de receitas...");
+        const select = document.getElementById('simulatorRecipe');
+        
+        // Limpar opções existentes
+        select.innerHTML = '<option value="">Selecione uma receita</option>';
+        
+        // Obter receitas
+        const recipes = Recipes.items;
+        console.log("Receitas disponíveis:", recipes.length);
+        
+        if (recipes && recipes.length > 0) {
+            // Adicionar receitas ordenadas por nome
+            recipes.sort((a, b) => a.name.localeCompare(b.name)).forEach(recipe => {
+                console.log("Adicionando receita ao select:", recipe.name);
+                select.innerHTML += `<option value="${recipe.id}">${recipe.name}</option>`;
+            });
+        } else {
+            console.log("Nenhuma receita encontrada para o select");
+        }
+    },
+    
+    // Atualizar tabela de preços
+    updatePricing: function() {
+        this.calculateAllPrices();
+        this.renderPricingTable();
+        this.populateRecipeSelect(); // Atualizamos também o select quando os preços são atualizados
+    },
+    
+    // Calcular preços para todas as receitas
+    // Calcular preços para todas as receitas
+	calculateAllPrices: function() {
+    const recipes = Recipes.items;
+    const laborCostPerMinute = Labor.getLaborCostPerMinute();
+    const fixedCostPerMinute = Costs.getFixedCostPerMinute();
+    
+    // Carregar configurações de preço
+    const pricingConfig = Storage.load(Storage.keys.pricingConfig, {});
+    
+    this.pricingData = recipes.map(recipe => {
+        // Custo de mão de obra
+        const laborCost = recipe.time * laborCostPerMinute;
+        
+        // Custo fixo
+        const fixedCost = recipe.time * fixedCostPerMinute;
+        
+        // Custo total de produção
+        const productionCost = recipe.materialCost + laborCost + fixedCost;
+        
+        // Verificar se existem configurações personalizadas para esta receita
+        let profitMargin = 0.5; // 50% padrão
+        let cardFee = 0.035; // 3.5% padrão
+        let appFee = 0; // 0% padrão
+        
+        // Se houver configurações salvas, usar elas
+        if (pricingConfig[recipe.id]) {
+            profitMargin = pricingConfig[recipe.id].profitMargin;
+            cardFee = pricingConfig[recipe.id].cardFee;
+            appFee = pricingConfig[recipe.id].appFee;
+        }
+        
+        // Cálculos de lucro e preço
+        const totalProfit = productionCost * profitMargin;
+        
+        // Preço por unidade (sem taxas)
+        const unitPrice = (productionCost + totalProfit) / recipe.production;
+        
+        // Preço final ajustado para taxa de cartão (preço = custo / (1 - taxa))
+        const finalPrice = unitPrice / (1 - (cardFee + appFee));
+        
+        return {
+            id: recipe.id,
+            name: recipe.name,
+            production: recipe.production,
+            materialCost: recipe.materialCost,
+            laborCost,
+            fixedCost,
+            productionCost,
+            profitMargin,
+            cardFee,
+            appFee,
+            totalProfit,
+            unitPrice,
+            finalPrice
+        };
+    });
+},
+    
+    // Renderizar tabela de preços
+    renderPricingTable: function() {
+        const tableBody = document.getElementById('pricingTable');
+        
+        if (!this.pricingData || this.pricingData.length === 0) {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="11" class="text-center py-4 text-gray-500 dark:text-gray-400">
+                        Nenhuma receita cadastrada para cálculo de preço
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        let html = '';
+        
+        // Ordenar por nome
+        this.pricingData.sort((a, b) => a.name.localeCompare(b.name));
+        
+        this.pricingData.forEach(item => {
+            html += `
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-750">
+                    <td class="px-2 py-3">${item.name}</td>
+                    <td class="px-2 py-3 text-right">${item.materialCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td class="px-2 py-3 text-right">${item.laborCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td class="px-2 py-3 text-right">${item.fixedCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td class="px-2 py-3 text-right font-medium">${item.productionCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td class="px-2 py-3 text-right">${(item.profitMargin * 100).toFixed(1)}%</td>
+                    <td class="px-2 py-3 text-right">${(item.cardFee * 100).toFixed(1)}%</td>
+                    <td class="px-2 py-3 text-right">${(item.appFee * 100).toFixed(1)}%</td>
+                    <td class="px-2 py-3 text-right">${item.totalProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td class="px-2 py-3 text-right">${item.unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td class="px-2 py-3 text-right font-bold text-green-600 dark:text-green-400">${item.finalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                </tr>
+            `;
+        });
+        
+        tableBody.innerHTML = html;
+    },
+    
+    // Simular preço para uma receita específica
+    // Atualizar preço para uma receita específica
+simulatePrice: function() {
+    console.log("Atualizando preço...");
+    
+    const recipeId = document.getElementById('simulatorRecipe').value;
+    console.log("ID da receita selecionada:", recipeId);
+    
+    if (!recipeId) {
+        console.log("Nenhuma receita selecionada.");
+        document.getElementById('simulationResult').classList.add('hidden');
+        return;
+    }
+    
+    const marginPercent = parseFloat(document.getElementById('simulatorMargin').value) / 100;
+    const cardFeePercent = parseFloat(document.getElementById('simulatorCardFee').value) / 100;
+    const appFeePercent = parseFloat(document.getElementById('simulatorAppFee').value) / 100;
+    
+    console.log("Margem:", marginPercent * 100, "% | Taxa Cartão:", cardFeePercent * 100, "% | Taxa APP:", appFeePercent * 100, "%");
+    
+    // Buscar receita
+    const recipe = Recipes.findRecipeById(recipeId);
+    
+    if (!recipe) {
+        console.log("Receita não encontrada.");
+        App.showNotification('Receita não encontrada', 'error');
+        return;
+    }
+    
+    // Obter custos atualizados
+    const laborCostPerMinute = Labor.getLaborCostPerMinute();
+    const fixedCostPerMinute = Costs.getFixedCostPerMinute();
+    
+    // Custo de mão de obra
+    const laborCost = recipe.time * laborCostPerMinute;
+    
+    // Custo fixo
+    const fixedCost = recipe.time * fixedCostPerMinute;
+    
+    // Custo total de produção
+    const productionCost = recipe.materialCost + laborCost + fixedCost;
+    
+    // Cálculos de lucro e preço
+    const totalProfit = productionCost * marginPercent;
+    
+    // Preço por unidade
+    const unitPrice = (productionCost + totalProfit) / recipe.production;
+    
+    // Preço final ajustado para taxa de cartão (preço = custo / (1 - taxa))
+    const finalPrice = unitPrice / (1 - (cardFeePercent + appFeePercent));
+    
+    console.log("Custo de produção:", productionCost, "| Preço final:", finalPrice);
+    
+    // Carregar configurações existentes ou criar um novo objeto
+    let pricingConfig = Storage.load(Storage.keys.pricingConfig, {});
+    
+    // Salvar configuração de preço personalizada
+    pricingConfig[recipeId] = {
+        profitMargin: marginPercent,
+        cardFee: cardFeePercent,
+        appFee: appFeePercent
+    };
+    
+    // Salvar no armazenamento permanente
+    Storage.save(Storage.keys.pricingConfig, pricingConfig);
+    
+    // Atualizar os dados de precificação para esta receita
+    const index = this.pricingData.findIndex(item => item.id === recipeId);
+    if (index !== -1) {
+        this.pricingData[index].profitMargin = marginPercent;
+        this.pricingData[index].cardFee = cardFeePercent;
+        this.pricingData[index].appFee = appFeePercent;
+        this.pricingData[index].totalProfit = totalProfit;
+        this.pricingData[index].unitPrice = unitPrice;
+        this.pricingData[index].finalPrice = finalPrice;
+        
+        // Atualizar a tabela de preços
+        this.renderPricingTable();
+        
+        App.showNotification('Preço da receita atualizado com sucesso', 'success');
+    }
+    
+    // Exibir resultado
+    document.getElementById('simCostResult').textContent = productionCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    document.getElementById('simPriceResult').textContent = finalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    document.getElementById('simUnitPriceResult').textContent = unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    document.getElementById('simProfitResult').textContent = totalProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    
+    // Mostrar resultado
+    document.getElementById('simulationResult').classList.remove('hidden');
+}
+};
+
+        const Dashboard = {
+            transactions: [],
+            
+            // Inicializar o módulo
+            init: function() {
+                this.loadTransactions();
+                this.updateDashboard();
+            },
+            
+            // Carregar transações do armazenamento
+            loadTransactions: function() {
+                this.transactions = Storage.load(Storage.keys.transactions, []);
+            },
+            
+            // Abrir modal de transação
+            openTransactionModal: function(transactionId = null) {
+                const modal = document.getElementById('transactionModal');
+                const form = document.getElementById('transactionForm');
+                
+                // Limpar formulário
+                form.reset();
+                
+                // Definir data atual como padrão
+                document.getElementById('transactionDate').valueAsDate = new Date();
+                
+                if (transactionId) {
+                    // Modo de edição
+                    const transaction = this.transactions.find(item => item.id === transactionId);
+                    
+                    if (transaction) {
+                        document.getElementById('transactionId').value = transaction.id;
+                        document.getElementById('transactionDate').value = transaction.date;
+                        document.getElementById('transactionDescription').value = transaction.description;
+                        document.getElementById('transactionType').value = transaction.type;
+                        document.getElementById('transactionAmount').value = transaction.amount.toFixed(2);
+                    }
+                } else {
+                    // Modo de adição
+                    document.getElementById('transactionId').value = '';
+                }
+                
+                // Exibir modal
+                modal.classList.remove('hidden');
+            },
+            
+            // Fechar modal de transação
+            closeTransactionModal: function() {
+                document.getElementById('transactionModal').classList.add('hidden');
+            },
+            
+            // Salvar transação
+			saveTransaction: function() {
+    const id = document.getElementById('transactionId').value;
+    const dateInput = document.getElementById('transactionDate').value; // YYYY-MM-DD
+    const description = document.getElementById('transactionDescription').value.trim();
+    const type = document.getElementById('transactionType').value;
+    const amount = parseFloat(document.getElementById('transactionAmount').value);
+
+    if (!dateInput || !description || isNaN(amount) || amount <= 0) {
+        App.showNotification('Preencha todos os campos corretamente', 'error');
+        return;
+    }
+
+    // Use a data diretamente do input
+    const formattedDate = dateInput; // Salve a data como a string do input
+
+    if (id) {
+        const index = this.transactions.findIndex(item => item.id === id);
+        if (index !== -1) {
+            this.transactions[index] = { id, date: formattedDate, description, type, amount };
+            App.showNotification('Transação atualizada com sucesso', 'success');
+        }
+    } else {
+        const newTransaction = {
+            id: Storage.generateId(),
+            date: formattedDate,
+            description,
+            type,
+            amount,
+            timestamp: new Date().toISOString()
+        };
+
+        this.transactions.push(newTransaction);
+        App.showNotification('Transação adicionada com sucesso', 'success');
+    }
+
+    Storage.save(Storage.keys.transactions, this.transactions);
+    this.renderTransactionsTable();
+    this.updateSummary();
+    this.closeTransactionModal();
+},
+		
+		// Função para excluir uma transação
+		deleteTransaction: function(id) {
+			if (confirm('Tem certeza que deseja excluir esta transação?')) {
+				this.transactions = this.transactions.filter(item => item.id !== id);
+				Storage.save(Storage.keys.transactions, this.transactions);
+				this.renderTransactionsTable();
+				this.updateSummary();
+				App.showNotification('Transação excluída com sucesso', 'success');
+			}
+		},
+            
+            // Atualizar dashboard
+            updateDashboard: function() {
+                this.renderTransactionsTable();
+                this.updateSummary();
+                this.updateCharts();
+            },
+            
+            // Renderizar tabela de transações
+   renderTransactionsTable: function() {
+    const tableBody = document.getElementById('transactionsTable');
+
+    if (this.transactions.length === 0) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="4" class="text-center py-4 text-gray-500 dark:text-gray-400">
+                    Nenhuma transação registrada
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    const sortedTransactions = [...this.transactions].sort((a, b) => {
+        // Ordenar por data (mais recente primeiro)
+        return new Date(b.date + 'T12:00:00') - new Date(a.date + 'T12:00:00');
+    });
+
+    let html = '';
+
+    sortedTransactions.forEach(transaction => {
+        // Formatação da data correta, usando partes da string de data
+        const parts = transaction.date.split('-');
+        const formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`; // DD/MM/YYYY
+        const isIncome = transaction.type === 'income';
+
+        html += `
+            <tr class="hover:bg-gray-50 dark:hover:bg-gray-750">
+                <td class="py-2 px-3">${formattedDate}</td>
+                <td class="py-2 px-3">${transaction.description}</td>
+                <td class="py-2 px-3">
+                    <span class="px-2 py-1 rounded text-xs ${isIncome ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                        ${isIncome ? 'Receita' : 'Despesa'}
+                    </span>
+                </td>
+                <td class="py-2 px-3 text-right font-medium ${isIncome ? 'text-green-600' : 'text-red-600'}">
+                    R$ ${transaction.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </td>
+                <td class="py-2 px-3 text-center">
+                    <button onclick="Dashboard.openTransactionModal('${transaction.id}')" class="text-blue-600 hover:text-blue-800">
+                        Editar
+                    </button>
+                    <button onclick="Dashboard.deleteTransaction('${transaction.id}')" class="text-red-600 hover:text-red-800 ml-2">
+                        Excluir
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+
+    tableBody.innerHTML = html;
+},
+            
+            // Atualizar resumo financeiro
+            updateSummary: function() {
+                // Filtrar apenas transações do mês atual
+                const currentMonth = new Date().getMonth();
+                const currentYear = new Date().getFullYear();
+                
+                const monthTransactions = this.transactions.filter(transaction => {
+                    const date = new Date(transaction.date + 'T12:00:00');
+                    return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+                });
+                
+                // Calcular receitas e despesas
+                const totalRevenue = monthTransactions
+                    .filter(transaction => transaction.type === 'income')
+                    .reduce((sum, transaction) => sum + transaction.amount, 0);
+                
+                const totalExpenses = monthTransactions
+                    .filter(transaction => transaction.type === 'expense')
+                    .reduce((sum, transaction) => sum + transaction.amount, 0);
+                
+                const totalProfit = totalRevenue - totalExpenses;
+                
+                // Atualizar UI com animação
+                this.animateCounter('totalRevenue', totalRevenue);
+                this.animateCounter('totalExpenses', totalExpenses);
+                this.animateCounter('totalProfit', totalProfit);
+            },
+            
+            // Animação de contador para valores
+            animateCounter: function(elementId, targetValue) {
+                const element = document.getElementById(elementId);
+                const startValue = parseFloat(element.textContent.replace(/[^0-9,-]/g, '')) || 0;
+                const duration = 1000; // 1 segundo
+                const steps = 20;
+                const stepValue = (targetValue - startValue) / steps;
+                
+                let currentStep = 0;
+                
+                const interval = setInterval(() => {
+                    currentStep++;
+                    
+                    const currentValue = startValue + (stepValue * currentStep);
+                    element.textContent = currentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    element.classList.add('count-animation');
+                    
+                    if (currentStep >= steps) {
+                        clearInterval(interval);
+                        element.textContent = targetValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    }
+                }, duration / steps);
+            },
+            
+            // Atualizar gráficos
+            updateCharts: function() {
+                this.updateProductSalesChart();
+                this.updateRevenueExpenseChart();
+            },
+            
+            // Atualizar gráfico de vendas por produto
+            updateProductSalesChart: function() {
+                const canvas = document.getElementById('productSalesChart');
+                
+                // Verificar se há um gráfico existente
+                if (canvas.chart) {
+                    canvas.chart.destroy();
+                }
+                
+                // Obter dados de vendas (usar receitas como exemplo)
+                const recipes = Recipes.items;
+                
+                // Se não há receitas, não criar gráfico
+                if (recipes.length === 0) {
+                    return;
+                }
+                
+                // Selecionar até 5 receitas mais caras
+                const topRecipes = [...recipes]
+                    .sort((a, b) => b.materialCost - a.materialCost)
+                    .slice(0, 5);
+                
+                const labels = topRecipes.map(recipe => recipe.name);
+                const data = topRecipes.map(recipe => recipe.materialCost);
+                
+                // Criar cores para cada item
+                const colors = [
+                    'rgba(93, 92, 222, 0.7)',
+                    'rgba(255, 99, 132, 0.7)',
+                    'rgba(54, 162, 235, 0.7)',
+                    'rgba(255, 206, 86, 0.7)',
+                    'rgba(75, 192, 192, 0.7)'
+                ];
+                
+                // Criar gráfico
+                canvas.chart = new Chart(canvas, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Custo de Materiais (R$)',
+                            data: data,
+                            backgroundColor: colors,
+                            borderColor: colors.map(color => color.replace('0.7', '1')),
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return 'R$ ' + value;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            },
+            
+            // Atualizar gráfico de receitas vs despesas
+            updateRevenueExpenseChart: function() {
+                const canvas = document.getElementById('revenueExpenseChart');
+                
+                // Verificar se há um gráfico existente
+                if (canvas.chart) {
+                    canvas.chart.destroy();
+                }
+                
+                // Obter dados dos últimos 6 meses
+                const months = [];
+                const revenues = [];
+                const expenses = [];
+                
+                const currentDate = new Date();
+                
+                for (let i = 5; i >= 0; i--) {
+                    const month = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+                    const monthName = month.toLocaleDateString('pt-BR', { month: 'short' });
+                    
+                    months.push(monthName);
+                    
+                    // Filtrar transações do mês
+                    const monthTransactions = this.transactions.filter(transaction => {
+                        // Adicionar T12:00:00 para evitar problemas de fuso horário
+                        const transactionDate = new Date(transaction.date + 'T12:00:00');
+                        return transactionDate.getMonth() === month.getMonth() && 
+                               transactionDate.getFullYear() === month.getFullYear();
+                    });
+                    
+                    // Calcular receitas e despesas
+                    const monthlyRevenue = monthTransactions
+                        .filter(transaction => transaction.type === 'income')
+                        .reduce((sum, transaction) => sum + transaction.amount, 0);
+                    
+                    const monthlyExpenses = monthTransactions
+                        .filter(transaction => transaction.type === 'expense')
+                        .reduce((sum, transaction) => sum + transaction.amount, 0);
+                    
+                    revenues.push(monthlyRevenue);
+                    expenses.push(monthlyExpenses);
+                }
+                
+                // Criar gráfico
+                canvas.chart = new Chart(canvas, {
+                    type: 'line',
+                    data: {
+                        labels: months,
+                        datasets: [
+                            {
+                                label: 'Receitas',
+                                data: revenues,
+                                borderColor: 'rgba(75, 192, 192, 1)',
+                                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                tension: 0.3,
+                                fill: true
+                            },
+                            {
+                                label: 'Despesas',
+                                data: expenses,
+                                borderColor: 'rgba(255, 99, 132, 1)',
+                                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                                tension: 0.3,
+                                fill: true
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                ticks: {
+                                    callback: function(value) {
+                                        return 'R$ ' + value;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        };
+
+        const App = {
+            // Inicializar aplicativo
+            init: function() {
+                // Inicializar armazenamento
+                Storage.initialize();
+                
+                // Configurar alternância de tema
+                this.setupThemeToggle();
+				
+				// Configurar botão para limpar o localStorage
+				  this.setupClearStorage();
+                
+                // Configurar navegação por abas
+                this.setupTabNavigation();
+                
+                // Configurar event listeners para modais
+                this.setupModalListeners();
+                
+                // Inicializar módulos
+                Ingredients.init();
+                Labor.init();
+                Costs.init();
+                Recipes.init();
+                Pricing.init();
+                Dashboard.init();
+            },
+            
+            // Configurar alternância de tema claro/escuro
+            setupThemeToggle: function() {
+                const themeToggle = document.getElementById('themeToggle');
+                const themeIcon = document.getElementById('themeIcon');
+                
+                // Atualizar ícone inicial
+                this.updateThemeIcon();
+                
+                themeToggle.addEventListener('click', () => {
+                    document.documentElement.classList.toggle('dark');
+                    this.updateThemeIcon();
+                });
+            },
+            
+            // Atualizar ícone de tema
+            updateThemeIcon: function() {
+                const themeIcon = document.getElementById('themeIcon');
+                
+                if (document.documentElement.classList.contains('dark')) {
+                    themeIcon.classList.remove('fa-moon');
+                    themeIcon.classList.add('fa-sun');
+                } else {
+                    themeIcon.classList.remove('fa-sun');
+                    themeIcon.classList.add('fa-moon');
+                }
+            },
+			
+			    // Configurar o botão para limpar o localStorage
+			setupClearStorage: function() {
+				const clearStorageBtn = document.getElementById('clearStorage');
+				
+				clearStorageBtn.addEventListener('click', () => {
+					localStorage.clear();
+					alert("Dados do localStorage apagados!");
+				});
+			},
+            
+            // Configurar navegação por abas
+            setupTabNavigation: function() {
+                const tabButtons = document.querySelectorAll('.tab-button');
+                const tabContents = document.querySelectorAll('.tab-content');
+                
+                tabButtons.forEach(button => {
+                    button.addEventListener('click', () => {
+                        // Remover classe "active" de todos os botões
+                        tabButtons.forEach(btn => {
+                            btn.classList.remove('active');
+                            btn.classList.remove('border-primary');
+                            btn.classList.add('border-transparent');
+                        });
+                        
+                        // Adicionar classe "active" ao botão clicado
+                        button.classList.add('active');
+                        button.classList.remove('border-transparent');
+                        button.classList.add('border-primary');
+                        
+                        // Ocultar todos os conteúdos
+                        tabContents.forEach(content => {
+                            content.classList.add('hidden');
+                        });
+                        
+                        // Exibir conteúdo correspondente
+                        const tabId = button.getAttribute('data-tab');
+                        document.getElementById(tabId).classList.remove('hidden');
+                    });
+                });
+            },
+            
+            // Configurar listeners para modais
+            setupModalListeners: function() {
+                // Ingredientes
+                document.getElementById('addIngredientBtn').addEventListener('click', () => {
+                    console.log('Botão de adicionar ingrediente clicado');
+                    Ingredients.openIngredientModal();
+                });
+                
+                document.getElementById('closeIngredientModal').addEventListener('click', () => {
+                    Ingredients.closeIngredientModal();
+                });
+                
+                document.getElementById('cancelIngredientBtn').addEventListener('click', () => {
+                    Ingredients.closeIngredientModal();
+                });
+                
+                document.getElementById('ingredientForm').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    Ingredients.saveIngredient();
+                });
+                
+                // Receitas
+                document.getElementById('addRecipeBtn').addEventListener('click', () => {
+                    console.log('Botão de adicionar receita clicado');
+                    Recipes.openRecipeModal();
+                });
+                
+                document.getElementById('closeRecipeModal').addEventListener('click', () => {
+                    Recipes.closeRecipeModal();
+                });
+                
+                document.getElementById('cancelRecipeBtn').addEventListener('click', () => {
+                    Recipes.closeRecipeModal();
+                });
+                
+                document.getElementById('recipeForm').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    Recipes.saveRecipe();
+                });
+                
+                document.getElementById('addRecipeIngredientBtn').addEventListener('click', () => {
+                    console.log('Botão de adicionar ingrediente à receita clicado');
+                    Recipes.addIngredientToRecipe();
+                });
+                
+                // Mostrar detalhes do ingrediente ao selecioná-lo
+                document.getElementById('recipeIngredient').addEventListener('change', () => {
+                    Recipes.updateIngredientDetails();
+                });
+                
+                // Atualizar custo do ingrediente quando quantidade mudar
+                document.getElementById('recipeIngredientQuantity').addEventListener('input', () => {
+                    Recipes.updateIngredientCost();
+                });
+                
+                // Transações
+                document.getElementById('addTransactionBtn').addEventListener('click', () => {
+                    Dashboard.openTransactionModal();
+                });
+                
+                document.getElementById('closeTransactionModal').addEventListener('click', () => {
+                    Dashboard.closeTransactionModal();
+                });
+                
+                document.getElementById('cancelTransactionBtn').addEventListener('click', () => {
+                    Dashboard.closeTransactionModal();
+                });
+                
+                document.getElementById('transactionForm').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    Dashboard.saveTransaction();
+                });
+                
+                // Custos Fixos
+                document.getElementById('costForm').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    Costs.saveCost();
+                });
+                
+                document.getElementById('cancelCostBtn').addEventListener('click', () => {
+                    Costs.resetCostForm();
+                });
+                
+                // Mão de Obra
+                document.getElementById('laborForm').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    Labor.saveData();
+                });
+                
+                // Simulador de preços
+                document.getElementById('simulateBtn').addEventListener('click', () => {
+                    Pricing.simulatePrice();
+                });
+                
+document.getElementById('simulatorRecipe').addEventListener('change', function() {
+    const recipeId = this.value;
+    if (!recipeId) return;
+    
+    // Carregar configurações de preço
+    const pricingConfig = Storage.load(Storage.keys.pricingConfig, {});
+    
+    // Se há configurações salvas para esta receita, carregá-las nos campos
+    if (pricingConfig[recipeId]) {
+        const config = pricingConfig[recipeId];
+        document.getElementById('simulatorMargin').value = (config.profitMargin * 100).toFixed(1);
+        document.getElementById('simulatorCardFee').value = (config.cardFee * 100).toFixed(1);
+        document.getElementById('simulatorAppFee').value = (config.appFee * 100).toFixed(1);
+    } else {
+        // Caso contrário, usar valores padrão
+        document.getElementById('simulatorMargin').value = "50";
+        document.getElementById('simulatorCardFee').value = "3.5";
+        document.getElementById('simulatorAppFee').value = "0";
+    }
+    
+    // Simular automaticamente o preço
+    Pricing.simulatePrice();
+});
+                
+                // Busca de ingredientes
+                document.getElementById('ingredientSearch').addEventListener('input', () => {
+                    Ingredients.filterIngredients();
+                });
+                
+                document.getElementById('ingredientCategory').addEventListener('change', () => {
+                    Ingredients.filterIngredients();
+                });
+                
+                // Busca de receitas
+                document.getElementById('recipeSearch').addEventListener('input', () => {
+                    Recipes.filterRecipes();
+                });
+            },
+            
+            // Exibir notificação
+            showNotification: function(message, type = 'info') {
+                // Remover notificações existentes
+                const existingNotifications = document.querySelectorAll('.notification');
+                existingNotifications.forEach(notification => {
+                    notification.remove();
+                });
+                
+                // Criar elemento de notificação
+                const notification = document.createElement('div');
+                notification.className = `notification notification-${type}`;
+                notification.innerHTML = `
+                    <div class="flex items-center">
+                        <i class="fas ${this.getNotificationIcon(type)} mr-2"></i>
+                        <span>${message}</span>
+                    </div>
+                `;
+                
+                // Adicionar ao documento
+                document.body.appendChild(notification);
+                
+                // Remover após alguns segundos
+                setTimeout(() => {
+                    notification.remove();
+                }, 3000);
+            },
+            
+            // Obter ícone para notificação
+            getNotificationIcon: function(type) {
+                switch (type) {
+                    case 'success': return 'fa-check-circle';
+                    case 'error': return 'fa-exclamation-circle';
+                    default: return 'fa-info-circle';
+                }
+            }
+        };
+
+        // Iniciar a aplicação quando o DOM estiver pronto
+        document.addEventListener('DOMContentLoaded', function() {
+            App.init();
+        });
+
+  <script>
+    // Service Worker registration
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js')
+        .then(reg => console.log('Service Worker registrado', reg))
+        .catch(err => console.error('Erro ao registrar SW', err));
+    }
+  </script>
+    </script>
+</body>
+</html>
