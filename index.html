@@ -1,17 +1,16 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Gestão de Geladões</title>
-  <link rel="manifest" href="manifest.json">
-  <link rel="icon" href="icon-192x192.png" type="image/png">
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com "></script>
-  <!-- Font Awesome -->
-  <script src="https://kit.fontawesome.com/a2e7fbd66c.js " crossorigin="anonymous"></script>
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js "></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geladão Sol de Verão - Sistema de Gestão</title>
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js para gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
     <style>
         /* Estilos personalizados para o SaaS de Geladão Gourmet */
 
@@ -114,7 +113,8 @@
             animation: countUp 0.5s ease-out;
         }
     </style>
-	 <script>
+    
+    <script>
         // Configuração do tema Tailwind
         tailwind.config = {
             darkMode: 'class',
@@ -859,7 +859,14 @@
             </form>
         </div>
     </div>
-
+    <script>
+    // Service Worker registration
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js')
+        .then(reg => console.log('Service Worker registrado', reg))
+        .catch(err => console.error('Erro ao registrar SW', err));
+    }
+  </script>
     <!-- Script principal -->
     <script>
         // Objetos de dados
@@ -2956,15 +2963,6 @@ document.getElementById('simulatorRecipe').addEventListener('change', function()
         document.addEventListener('DOMContentLoaded', function() {
             App.init();
         });
-
-  <script>
-    // Service Worker registration
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js')
-        .then(reg => console.log('Service Worker registrado', reg))
-        .catch(err => console.error('Erro ao registrar SW', err));
-    }
-  </script>
     </script>
 </body>
 </html>
