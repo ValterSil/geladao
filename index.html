@@ -116,36 +116,87 @@
         }
     </style>
     
-    <script>
-        // Configuração do tema Tailwind
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#5D5CDE',
-                        'primary-dark': '#4948B3',
-                        'primary-light': '#7978E9',
-                        'ice-blue': '#E0F7FF',
-                        'ice-pink': '#FFE6F2',
-                        'ice-green': '#E3FCE9',
-                    }
+   <script>
+    // Configuração do tema Tailwind
+    tailwind.config = {
+        darkMode: 'class',
+        theme: {
+            extend: {
+                colors: {
+                    primary: '#5D5CDE',
+                    'primary-dark': '#4948B3',
+                    'primary-light': '#7978E9',
+                    'ice-blue': '#E0F7FF',
+                    'ice-pink': '#FFE6F2',
+                    'ice-green': '#E3FCE9',
                 }
             }
         }
-        
-        // Detectar preferência de modo escuro
-        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            document.documentElement.classList.add('dark');
+    };
+
+    // Lógica para alternar tema (Dark/Light Mode)
+    // Se não houver tema salvo no localStorage, define 'light' como padrão
+    if (!('theme' in localStorage)) {
+        localStorage.theme = 'light';
+    }
+
+    // Aplica o tema com base no que está salvo no localStorage
+    if (localStorage.theme === 'dark') {
+        document.documentElement.classList.add('dark');
+    } else {
+        document.documentElement.classList.remove('dark');
+    }
+
+    // Listener para o botão de alternar tema
+    document.addEventListener('DOMContentLoaded', () => {
+        const themeToggleBtn = document.getElementById('themeToggle');
+        const themeIcon = document.getElementById('themeIcon'); // Adicionado para mudar o ícone
+
+        // Função para atualizar o ícone do botão
+        const updateThemeIcon = () => {
+            if (document.documentElement.classList.contains('dark')) {
+                themeIcon.classList.remove('fa-moon');
+                themeIcon.classList.add('fa-sun');
+            } else {
+                themeIcon.classList.remove('fa-sun');
+                themeIcon.classList.add('fa-moon');
+            }
+        };
+
+        if (themeToggleBtn) {
+            themeToggleBtn.addEventListener('click', () => {
+                if (document.documentElement.classList.contains('dark')) {
+                    document.documentElement.classList.remove('dark');
+                    localStorage.theme = 'light';
+                } else {
+                    document.documentElement.classList.add('dark');
+                    localStorage.theme = 'dark';
+                }
+                updateThemeIcon(); // Atualiza o ícone após a mudança de tema
+            });
+            // Garante que o ícone esteja correto na carga inicial
+            updateThemeIcon(); 
         }
+
+        // Listener para mudanças na preferência de tema do sistema (opcional, mas bom ter)
         window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            // Se o usuário não tiver uma preferência explícita salva,
+            // ou se quiser que a mudança do sistema prevaleça,
+            // remova ou comente a linha abaixo 'localStorage.removeItem('theme');'
+            // para que a preferência do sistema sobrescreva a do localStorage
+            // ou deixe a preferência do localStorage intacta para ter prioridade.
+            // Para manter a escolha do usuário prioridade, NÃO remova 'theme' do localStorage.
+            // Se você quer que o sistema sempre sobrescreva se não houver clique:
+            // localStorage.removeItem('theme'); // Comente ou remova se quiser a escolha do usuário como prioridade
             if (event.matches) {
                 document.documentElement.classList.add('dark');
             } else {
                 document.documentElement.classList.remove('dark');
             }
+            updateThemeIcon();
         });
-    </script>
+    });
+</script>
 </head>
 <body class="bg-white dark:bg-gray-900 min-h-screen">
     <!-- Cabeçalho -->
